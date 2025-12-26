@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { Habit, HabitLog, MoodLog } from '@/store/useKineticStore';
 
 export async function syncToCloud(userId: string, state: any) {
   try {
@@ -7,7 +8,7 @@ export async function syncToCloud(userId: string, state: any) {
       const { error: habitsError } = await supabase
         .from('habits')
         .upsert(
-          state.habits.map(h => ({
+          state.habits.map((h: Habit) => ({
             id: h.id,
             user_id: userId,
             name: h.name,
@@ -16,7 +17,7 @@ export async function syncToCloud(userId: string, state: any) {
             unit: h.unit,
             schedule: h.schedule,
             streak: h.streak,
-            best_streak: h.best_streak || h.bestStreak || 0,
+            best_streak: h.bestStreak || 0,
             category: h.category,
             icon: h.icon,
             is_archived: h.isArchived,
@@ -32,7 +33,7 @@ export async function syncToCloud(userId: string, state: any) {
       const { error: logsError } = await supabase
         .from('habit_logs')
         .upsert(
-          state.habitLogs.map(l => ({
+          state.habitLogs.map((l: HabitLog) => ({
             id: l.id,
             user_id: userId,
             habit_id: l.habitId,
@@ -49,7 +50,7 @@ export async function syncToCloud(userId: string, state: any) {
       const { error: moodsError } = await supabase
         .from('mood_logs')
         .upsert(
-          state.moodLogs.map(m => ({
+          state.moodLogs.map((m: MoodLog) => ({
             id: m.id,
             user_id: userId,
             score: m.score,
@@ -97,18 +98,18 @@ export async function fetchFromCloud(userId: string) {
     return {
       success: true,
       data: {
-        habits: habits?.map(h => ({
+        habits: habits?.map((h: any) => ({
           ...h,
           bestStreak: h.best_streak,
           isArchived: h.is_archived,
           createdAt: h.created_at
         })) || [],
-        habitLogs: logs?.map(l => ({
+        habitLogs: logs?.map((l: any) => ({
           ...l,
           habitId: l.habit_id,
           completedAt: l.completed_at
         })) || [],
-        moodLogs: moods?.map(m => ({
+        moodLogs: moods?.map((m: any) => ({
           ...m,
           loggedAt: m.logged_at
         })) || [],
