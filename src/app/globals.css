@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--theme-background);
+  --color-foreground: var(--theme-foreground);
+  --color-kinetic-white: var(--theme-foreground);
+  --color-kinetic-gray: var(--theme-gray);
+  --color-kinetic-dark: var(--theme-dark);
+  --color-kinetic-glow: var(--theme-glow);
+  --color-glass-bg: var(--theme-glass-bg);
+  --color-glass-border: var(--theme-glass-border);
+  --color-glass-hover: var(--theme-glass-hover);
+  --font-sans: var(--font-outfit);
+}
+
+/* Dark Theme (default) */
+:root,
+[data-theme="dark"] {
+  --theme-background: #000000;
+  --theme-foreground: #ffffff;
+  --theme-gray: #a3a3a3;
+  --theme-dark: #171717;
+  --theme-glow: rgba(255, 255, 255, 0.5);
+  --theme-glass-bg: rgba(23, 23, 23, 0.6);
+  --theme-glass-border: rgba(255, 255, 255, 0.15);
+  --theme-glass-hover: rgba(38, 38, 38, 0.8);
+  --theme-card-bg: rgba(23, 23, 23, 0.6);
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #a3a3a3;
+  --theme-text-muted: #525252;
+  --theme-border: rgba(255, 255, 255, 0.15);
+  --theme-scrollbar-track: #000000;
+  --theme-scrollbar-thumb: #333333;
+  --theme-scrollbar-thumb-hover: #555555;
+  --theme-slider-track: #333333;
+  --theme-slider-thumb-bg: #000000;
+  --theme-slider-thumb-border: #ffffff;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --theme-background: #f5f5f5;
+  --theme-foreground: #171717;
+  --theme-gray: #525252;
+  --theme-dark: #e5e5e5;
+  --theme-glow: rgba(0, 0, 0, 0.1);
+  --theme-glass-bg: rgba(255, 255, 255, 0.8);
+  --theme-glass-border: rgba(0, 0, 0, 0.1);
+  --theme-glass-hover: rgba(245, 245, 245, 0.9);
+  --theme-card-bg: rgba(255, 255, 255, 0.8);
+  --theme-text-primary: #171717;
+  --theme-text-secondary: #525252;
+  --theme-text-muted: #737373;
+  --theme-border: rgba(0, 0, 0, 0.1);
+  --theme-scrollbar-track: #f5f5f5;
+  --theme-scrollbar-thumb: #d4d4d4;
+  --theme-scrollbar-thumb-hover: #a3a3a3;
+  --theme-slider-track: #d4d4d4;
+  --theme-slider-thumb-bg: #ffffff;
+  --theme-slider-thumb-border: #171717;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--theme-background);
+  color: var(--theme-foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--theme-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-scrollbar-thumb-hover);
+}
+
+/* Glassmorphism base */
+.glass {
+  background: var(--theme-glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--theme-glass-border);
+  border-radius: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-hover:hover {
+  background: var(--theme-glass-hover);
+  border-color: var(--theme-border);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+}
+
+/* Glow effects */
+.glow-white {
+  box-shadow: 0 0 40px var(--theme-glow), 0 0 20px var(--theme-glow);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px var(--theme-glow);
+}
+
+/* Slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--theme-slider-track);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--theme-slider-thumb-bg);
+  border: 2px solid var(--theme-slider-thumb-border);
+  margin-top: -10px;
+  box-shadow: 0 0 10px var(--theme-glow);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  background: var(--theme-slider-thumb-border);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--theme-slider-track);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--theme-slider-thumb-bg);
+  border: 2px solid var(--theme-slider-thumb-border);
+  box-shadow: 0 0 10px var(--theme-glow);
+}
