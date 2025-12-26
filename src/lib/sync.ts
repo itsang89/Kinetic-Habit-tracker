@@ -3,6 +3,11 @@ import type { Habit, HabitLog, MoodLog } from '@/store/useKineticStore';
 
 export async function syncToCloud(userId: string, state: any) {
   try {
+    // Skip if supabase is not available
+    if (!supabase) {
+      return { success: false, error: new Error('Supabase not configured') };
+    }
+
     // 1. Sync habits
     if (state.habits.length > 0) {
       const { error: habitsError } = await supabase
@@ -81,6 +86,11 @@ export async function syncToCloud(userId: string, state: any) {
 
 export async function fetchFromCloud(userId: string) {
   try {
+    // Skip if supabase is not available
+    if (!supabase) {
+      return { success: false, error: new Error('Supabase not configured') };
+    }
+
     const [
       { data: habits, error: hErr },
       { data: logs, error: lErr },

@@ -392,6 +392,7 @@ export const useKineticStore = create<KineticState>()(
       },
 
       syncToCloud: async () => {
+        if (!supabase) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -406,6 +407,7 @@ export const useKineticStore = create<KineticState>()(
       },
 
       fetchFromCloud: async () => {
+        if (!supabase) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -429,6 +431,7 @@ export const useKineticStore = create<KineticState>()(
       },
 
       initializeStore: async () => {
+        if (!supabase) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await get().fetchFromCloud();

@@ -20,6 +20,12 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
+    if (!supabase) {
+      setError('Authentication service is not available');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({ 

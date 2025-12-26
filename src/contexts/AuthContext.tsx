@@ -23,8 +23,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { initializeStore } = useKineticStore();
 
   useEffect(() => {
+    // Skip if supabase is not available (build time)
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data }: { data: any }) => {
+      const session = data.session;
       setUser(session?.user ?? null);
       setLoading(false);
       if (session?.user) {
@@ -34,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (_event: any, session: any) => {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
@@ -47,7 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [initializeStore]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   return (
