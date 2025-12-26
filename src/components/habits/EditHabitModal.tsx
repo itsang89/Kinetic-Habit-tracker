@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star, ToggleLeft, Timer, Hash } from 'lucide-react';
+import { X, Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star, Shield, ToggleLeft, Timer, Hash } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Habit, HabitIcon, HabitCategory, DayOfWeek, HabitType, useKineticStore } from '@/store/useKineticStore';
 
@@ -21,6 +21,7 @@ const iconOptions: { icon: HabitIcon; component: React.ElementType }[] = [
   { icon: 'target', component: Target },
   { icon: 'zap', component: Zap },
   { icon: 'star', component: Star },
+  { icon: 'shield', component: Shield },
 ];
 
 const categoryOptions: { value: HabitCategory; label: string }[] = [

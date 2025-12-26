@@ -19,6 +19,7 @@ const iconMap: Record<HabitIcon, React.ElementType> = {
   droplet: Droplet, book: Book, brain: Brain, dumbbell: Dumbbell,
   heart: Heart, sun: Sun, moon: Moon, coffee: Coffee, pencil: Pencil,
   code: Code, music: Music, leaf: Leaf, target: Target, zap: Zap, star: Star,
+  shield: Shield,
 };
 
 export default function HabitDetailPage() {

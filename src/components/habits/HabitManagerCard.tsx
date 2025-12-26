@@ -3,7 +3,7 @@
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { 
   Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, 
-  Pencil, Code, Music, Leaf, Target, Zap, Star,
+  Pencil, Code, Music, Leaf, Target, Zap, Star, Shield,
   Edit3, Archive, ArchiveRestore, ChevronRight
 } from 'lucide-react';
 import { Habit, HabitIcon, useKineticStore } from '@/store/useKineticStore';
@@ -26,6 +26,7 @@ const iconMap: Record<HabitIcon, React.ElementType> = {
   target: Target,
   zap: Zap,
   star: Star,
+  shield: Shield,
 };
 
 interface HabitManagerCardProps {

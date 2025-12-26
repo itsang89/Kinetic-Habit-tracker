@@ -9,7 +9,7 @@ export type HabitCategory = 'health' | 'learning' | 'productivity' | 'mindfulnes
 
 export type HabitType = 'simple' | 'duration' | 'count';
 
-export type HabitIcon = 'droplet' | 'book' | 'brain' | 'dumbbell' | 'heart' | 'sun' | 'moon' | 'coffee' | 'pencil' | 'code' | 'music' | 'leaf' | 'target' | 'zap' | 'star';
+export type HabitIcon = 'droplet' | 'book' | 'brain' | 'dumbbell' | 'heart' | 'sun' | 'moon' | 'coffee' | 'pencil' | 'code' | 'music' | 'leaf' | 'target' | 'zap' | 'star' | 'shield';
 
 export interface Habit {
   id: string;

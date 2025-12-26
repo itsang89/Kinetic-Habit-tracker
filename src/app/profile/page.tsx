@@ -49,12 +49,13 @@ const iconMap: Record<HabitIcon, React.ElementType> = {
   target: Target,
   zap: Zap,
   star: Star,
+  shield: Shield,
 };
 
 const iconOptions: HabitIcon[] = [
   'droplet', 'book', 'brain', 'dumbbell', 'heart', 
   'sun', 'moon', 'coffee', 'pencil', 'code', 
-  'music', 'leaf', 'target', 'zap', 'star'
+  'music', 'leaf', 'target', 'zap', 'star', 'shield'
 ];
 import BottomNav from '@/components/BottomNav';
 import Link from 'next/link';
