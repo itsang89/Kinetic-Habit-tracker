@@ -20,14 +20,12 @@ const formatNumber = (num: number): string => {
   return num.toString();
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function TotalVolumeCards() {
   const { getTotalVolume, habits } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const volumes = mounted ? getTotalVolume() : [];
 

@@ -7,14 +7,12 @@ import { useEffect, useState, useMemo } from 'react';
 import TrendDetailModal from './TrendDetailModal';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function WeeklyWrapCard() {
   const { getWeeklySummary, habits, habitLogs, moodLogs } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const summary = mounted ? getWeeklySummary() : { topHabit: null, totalCompletions: 0, completionRate: 0, momentumChange: 0, avgMood: null };
 
@@ -26,7 +24,7 @@ export default function WeeklyWrapCard() {
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date.toISOString().split('T')[0] || '';
       const dayLogs = habitLogs.filter(l => l.completedAt.startsWith(dateString));
       const moodLog = moodLogs.find(m => m.loggedAt.startsWith(dateString));
       

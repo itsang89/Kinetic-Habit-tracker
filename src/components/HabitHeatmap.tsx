@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 type HeatmapDay = {
   date: string;
@@ -12,43 +12,36 @@ type HeatmapDay = {
   weekIndex: number;
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function HabitHeatmap() {
   const { habits, habitLogs } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
-  const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
+  const mounted = useMounted();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
+  const heatmapData = useMemo(() => {
+    if (!mounted) return [];
     
-    const generateHeatmapData = () => {
-      const data: HeatmapDay[] = [];
-      const today = new Date();
+    const data: HeatmapDay[] = [];
+    const today = new Date();
+    
+    for (let i = 364; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateString = date.toISOString().split('T')[0] || '';
       
-      for (let i = 364; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateString = date.toISOString().split('T')[0];
-        
-        const completions = habitLogs.filter(
-          (log) => log.completedAt.startsWith(dateString)
-        ).length;
-        
-        data.push({
-          date: dateString,
-          count: completions,
-          dayOfWeek: date.getDay(),
-          weekIndex: Math.floor(i / 7),
-        });
-      }
+      const completions = habitLogs.filter(
+        (log) => log.completedAt.startsWith(dateString)
+      ).length;
       
-      return data.reverse();
-    };
-
-    setHeatmapData(generateHeatmapData());
+      data.push({
+        date: dateString,
+        count: completions,
+        dayOfWeek: date.getDay(),
+        weekIndex: Math.floor(i / 7),
+      });
+    }
+    
+    return data.reverse();
   }, [mounted, habitLogs]);
   
   const getIntensityColor = (count: number) => {
@@ -68,7 +61,7 @@ export default function HabitHeatmap() {
     const labels: { month: string; weekIndex: number }[] = [];
     let lastMonth = -1;
     
-    heatmapData.forEach((day, index) => {
+    heatmapData.forEach((day: HeatmapDay, index: number) => {
       const date = new Date(day.date);
       const month = date.getMonth();
       
@@ -122,7 +115,7 @@ export default function HabitHeatmap() {
                   position: 'relative',
                   left: `${label.weekIndex * 14}px`,
                   marginRight: i < monthLabels.length - 1 
-                    ? `${(monthLabels[i + 1]?.weekIndex - label.weekIndex) * 14 - 30}px` 
+                    ? `${((monthLabels[i + 1]?.weekIndex ?? 0) - label.weekIndex) * 14 - 30}px` 
                     : 0
                 }}
               >
@@ -143,9 +136,9 @@ export default function HabitHeatmap() {
             </div>
 
             <div className="flex gap-[3px]">
-              {weeks.map((week, weekIndex) => (
+              {weeks.map((week: HeatmapDay[], weekIndex: number) => (
                 <div key={weekIndex} className="flex flex-col gap-[3px]">
-                  {week.map((day, dayIndex) => (
+                  {week.map((day: HeatmapDay, dayIndex: number) => (
                     <motion.div
                       key={`${weekIndex}-${dayIndex}`}
                       initial={{ opacity: 0 }}

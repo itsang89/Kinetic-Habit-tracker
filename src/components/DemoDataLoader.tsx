@@ -1,25 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useKineticStore, DayOfWeek, HabitLog, MoodLog, HabitCategory, HabitIcon, HabitType } from '@/store/useKineticStore';
+import { useKineticStore } from '@/store/useKineticStore';
 import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
-
-const generateId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-};
+import { useMounted } from '@/hooks/useMounted';
+import { DEMO_HABIT_CONFIGS, generateHistoricalData, calculateStreaksForHabits } from '@/lib/demoData';
 
 export default function DemoDataLoader() {
   const store = useKineticStore();
   const [showButton, setShowButton] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   useEffect(() => {
     // Only show the button if no data exists, after hydration
@@ -28,23 +19,11 @@ export default function DemoDataLoader() {
     }
   }, [mounted, store.habits.length, store.habitLogs.length, store.moodLogs.length]);
 
-  const loadDemoData = () => {
-    // Create habits with categories, icons, and types
-    const habitConfigs: { name: string; unit: string; target: number; schedule: DayOfWeek[]; category: HabitCategory; icon: HabitIcon; type: HabitType }[] = [
-      { name: 'Morning Meditation', unit: 'mins', target: 15, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'mindfulness', icon: 'sun', type: 'duration' },
-      { name: 'Read Books', unit: 'pages', target: 20, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sun'], category: 'learning', icon: 'book', type: 'count' },
-      { name: 'Deep Work', unit: 'hours', target: 4, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], category: 'productivity', icon: 'brain', type: 'count' },
-      { name: 'Exercise', unit: 'mins', target: 45, schedule: ['Mon', 'Wed', 'Fri', 'Sat'], category: 'fitness', icon: 'dumbbell', type: 'duration' },
-      { name: 'Journal', unit: 'entry', target: 1, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'mindfulness', icon: 'pencil', type: 'simple' },
-      { name: 'Drink Water', unit: 'cups', target: 8, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'health', icon: 'droplet', type: 'count' },
-      { name: 'Code Practice', unit: 'mins', target: 60, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], category: 'learning', icon: 'code', type: 'duration' },
-      { name: 'Sunlight Exposure', unit: 'mins', target: 15, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'health', icon: 'sun', type: 'duration' },
-      { name: 'Deep Breathing', unit: 'sets', target: 3, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'mindfulness', icon: 'zap', type: 'count' },
-      { name: 'No Alcohol', unit: 'day', target: 1, schedule: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], category: 'health', icon: 'shield', type: 'simple' },
-    ];
-
+  const loadDemoData = async () => {
     // Add habits
-    habitConfigs.forEach((habit) => store.addHabit(habit));
+    for (const habit of DEMO_HABIT_CONFIGS) {
+      await store.addHabit(habit);
+    }
     
     // Generate 90 days of historical data
     const today = new Date();
@@ -58,116 +37,8 @@ export default function DemoDataLoader() {
     }));
 
     const createdHabits = useKineticStore.getState().habits;
-    const logs: HabitLog[] = [];
-    const moods: MoodLog[] = [];
-    
-    for (let daysAgo = 90; daysAgo >= 0; daysAgo--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysAgo);
-      const dateString = date.toISOString().split('T')[0];
-      const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
-      
-      // Simulate habit completions with varying completion rates
-      createdHabits.forEach((habit, habitIndex) => {
-        if (!habit.schedule.includes(dayOfWeek)) return;
-        
-        // Different interaction rates for different habits (50-98%)
-        const baseInteractionRate = 0.5 + (habitIndex * 0.04);
-        // Weekends have slightly lower completion for productivity/learning
-        const isWeekend = dayOfWeek === 'Sat' || dayOfWeek === 'Sun';
-        const weekendPenalty = (isWeekend && (habit.category === 'productivity' || habit.category === 'learning')) ? 0.2 : 0;
-        // Recent days have higher completion (building momentum)
-        const recencyBonus = daysAgo < 21 ? 0.2 : 0;
-        
-        const interactionChance = Math.min(0.98, baseInteractionRate - weekendPenalty + recencyBonus);
-        
-        if (Math.random() < interactionChance) {
-          // Vary the completion time throughout the day (6am - 11pm)
-          const hour = 6 + Math.floor(Math.random() * 17);
-          const minute = Math.floor(Math.random() * 60);
-          const completedAt = new Date(date);
-          completedAt.setHours(hour, minute, 0, 0);
-          
-          // Calculate a value - sometimes partial, sometimes full, sometimes over
-          let value = habit.target;
-          const randomFactor = Math.random();
-          
-          if (habit.type === 'simple') {
-              value = 1;
-          } else {
-              if (randomFactor < 0.15) {
-                  // Partial (30-90%)
-                  value = Math.floor(habit.target * (0.3 + Math.random() * 0.6));
-              } else if (randomFactor < 0.85) {
-                  // Exactly target
-                  value = habit.target;
-              } else {
-                  // Over target (up to 150%)
-                  value = Math.floor(habit.target * (1.0 + Math.random() * 0.5));
-              }
-          }
-          
-          logs.push({
-            id: generateId(),
-            habitId: habit.id,
-            completedAt: completedAt.toISOString(),
-            value: value,
-          });
-        }
-      });
-      
-      // Log mood (mostly between 4-10, with some variation)
-      const baseMood = 6.0;
-      // Mood correlates strongly with habit completion rate
-      const dayLogs = logs.filter(l => l.completedAt.startsWith(dateString));
-      const scheduledForDay = createdHabits.filter(h => h.schedule.includes(dayOfWeek)).length;
-      const completionRate = scheduledForDay > 0 ? dayLogs.length / scheduledForDay : 1;
-      
-      const moodBonus = Math.min(4, completionRate * 4);
-      const randomVariation = (Math.random() - 0.5) * 2.5;
-      const moodScore = Math.round(Math.max(1, Math.min(10, baseMood + moodBonus + randomVariation)));
-      
-      moods.push({
-        id: generateId(),
-        score: moodScore,
-        loggedAt: new Date(date.setHours(21, 0, 0, 0)).toISOString(),
-      });
-    }
-    
-    // Update streaks and best streaks based on generated logs
-    const finalHabits = createdHabits.map(habit => {
-      let currentStreak = 0;
-      let maxStreak = 0;
-      
-      // Iterate from oldest to newest to calculate streaks
-      for (let daysAgo = 90; daysAgo >= 0; daysAgo--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - daysAgo);
-        const dateString = date.toISOString().split('T')[0];
-        const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
-        
-        if (habit.schedule.includes(dayOfWeek)) {
-          const log = logs.find(l => l.habitId === habit.id && l.completedAt.startsWith(dateString));
-          const isCompleted = log ? log.value >= habit.target : false;
-          
-          if (isCompleted) {
-            currentStreak++;
-            maxStreak = Math.max(maxStreak, currentStreak);
-          } else {
-            // Only reset streak if the day is in the past (not today)
-            if (daysAgo > 0) {
-              currentStreak = 0;
-            }
-          }
-        }
-      }
-      
-      return {
-        ...habit,
-        streak: currentStreak,
-        bestStreak: maxStreak
-      };
-    });
+    const { logs, moods } = generateHistoricalData(createdHabits);
+    const finalHabits = calculateStreaksForHabits(createdHabits, logs);
     
     // Directly set the state with all the generated data
     useKineticStore.setState((state) => ({
@@ -197,7 +68,6 @@ export default function DemoDataLoader() {
     }, 100);
   };
 
-  // Show load button if no data, show reset button if there's data
   const hasData = store.habits.length > 0 || store.habitLogs.length > 0;
 
   if (!mounted) return null;

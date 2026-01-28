@@ -5,6 +5,8 @@ import { Smile } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
 import { useState, useEffect } from 'react';
 
+import { useMounted } from '@/hooks/useMounted';
+
 const moodEmojis = ['💀', '😫', '😩', '☹️', '😐', '🙂', '😊', '😎', '🤩', '🚀'];
 const moodLabels = ['Terrible', 'Very Bad', 'Bad', 'Poor', 'Okay', 'Good', 'Great', 'Excellent', 'Amazing', 'Unstoppable'];
 
@@ -14,17 +16,13 @@ interface MoodSliderProps {
 
 export default function MoodSlider({ date }: MoodSliderProps) {
   const { logMood, getMoodOnDate } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [mood, setMood] = useState(5);
   const [hasLogged, setHasLogged] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (!mounted) return;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || new Date().toISOString().split('T')[0] || '';
     const todaysMood = getMoodOnDate(targetDate);
     if (todaysMood !== null) {
       setMood(todaysMood);

@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, ReactNode } from 'react';
 import { ResponsiveContainer } from 'recharts';
 
+import LoadingSpinner from '@/components/LoadingSpinner';
+
 interface ChartContainerProps {
   children: ReactNode;
   className?: string;
@@ -64,7 +66,7 @@ export default function ChartContainer({
         </ResponsiveContainer>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+          <LoadingSpinner size="sm" />
         </div>
       )}
     </div>

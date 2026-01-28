@@ -1,11 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Plus, ListChecks } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useKineticStore, DayOfWeek } from '@/store/useKineticStore';
+import { useKineticStore, DayOfWeek, Habit } from '@/store/useKineticStore';
 import HabitCard from './HabitCard';
+
+import { useMounted } from '@/hooks/useMounted';
 
 interface HabitListProps {
   date?: string; // Format: YYYY-MM-DD
@@ -14,61 +17,67 @@ interface HabitListProps {
 export default function HabitList({ date }: HabitListProps) {
   const { habits, isHabitCompletedOnDate } = useKineticStore();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [todayDay, setTodayDay] = useState<DayOfWeek>('Mon');
   const [initialCompletionMap, setInitialCompletionMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setMounted(true);
     const targetDate = date ? new Date(date) : new Date();
     const days: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    setTodayDay(days[targetDate.getDay()]);
+    setTodayDay(days[targetDate.getDay()] || 'Mon');
   }, [date]);
 
   // Capture initial completion states when the component mounts or date changes
   // This prevents habits from jumping around while the user is interacting with them
   useEffect(() => {
     if (mounted) {
-      const targetDate = date || new Date().toISOString().split('T')[0];
+      const targetDate = date || new Date().toISOString().split('T')[0] || '';
       const map: Record<string, boolean> = {};
       habits.forEach(h => {
         map[h.id] = isHabitCompletedOnDate(h.id, targetDate);
       });
       setInitialCompletionMap(map);
     }
-  }, [date, mounted]);
+  }, [date, mounted, habits, isHabitCompletedOnDate]);
 
   // Filter habits scheduled for today AND existed on this day
-  const todaysHabits = mounted ? habits
-    .filter((h) => {
-      const habitCreatedDate = new Date(h.createdAt);
-      habitCreatedDate.setHours(0, 0, 0, 0);
-      const viewDate = date ? new Date(date + 'T12:00:00') : new Date();
-      viewDate.setHours(0, 0, 0, 0);
-      
-      return h.schedule.includes(todayDay) && habitCreatedDate <= viewDate;
-    })
-    .sort((a, b) => {
-        // Use the initial completion status for sorting to keep items in place
-        // They will only "sink" to the bottom the next time the page is loaded/opened
-        const aCompleted = initialCompletionMap[a.id] ?? isHabitCompletedOnDate(a.id, date || new Date().toISOString().split('T')[0]);
-        const bCompleted = initialCompletionMap[b.id] ?? isHabitCompletedOnDate(b.id, date || new Date().toISOString().split('T')[0]);
+  const todaysHabits = useMemo(() => {
+    if (!mounted) return [];
+    
+    return habits
+      .filter((h) => {
+        const habitCreatedDate = new Date(h.createdAt);
+        habitCreatedDate.setHours(0, 0, 0, 0);
+        const viewDate = date ? new Date(date + 'T12:00:00') : new Date();
+        viewDate.setHours(0, 0, 0, 0);
         
-        if (aCompleted === bCompleted) return 0;
-        return aCompleted ? 1 : -1; 
-    }) 
-    : [];
+        return h.schedule.includes(todayDay) && habitCreatedDate <= viewDate;
+      })
+      .sort((a, b) => {
+          // Use the initial completion status for sorting to keep items in place
+          // They will only "sink" to the bottom the next time the page is loaded/opened
+          const defaultDate = new Date().toISOString().split('T')[0] || '';
+          const aCompleted = initialCompletionMap[a.id] ?? isHabitCompletedOnDate(a.id, date || defaultDate);
+          const bCompleted = initialCompletionMap[b.id] ?? isHabitCompletedOnDate(b.id, date || defaultDate);
+          
+          if (aCompleted === bCompleted) return 0;
+          return aCompleted ? 1 : -1; 
+      });
+  }, [mounted, habits, date, todayDay, initialCompletionMap, isHabitCompletedOnDate]);
 
-  const otherHabits = mounted ? habits.filter((h) => !h.schedule.includes(todayDay)) : [];
+  const otherHabits = useMemo(() => {
+    if (!mounted) return [];
+    return habits.filter((h) => !h.schedule.includes(todayDay));
+  }, [mounted, habits, todayDay]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split('T')[0] || '';
   const isToday = !date || date === todayStr;
   const isFuture = date ? date > todayStr : false;
   
   const displayDate = date ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric',
-    year: date.split('-')[0] !== new Date().getFullYear().toString() ? 'numeric' : undefined
+    year: (date.split('-')[0] || '') !== new Date().getFullYear().toString() ? 'numeric' : undefined
   }) : '';
 
   return (
@@ -93,15 +102,13 @@ export default function HabitList({ date }: HabitListProps) {
                </p>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push('/habits?add=true')}
+          <Link
+            href="/habits?add=true"
             className="px-4 py-2 rounded-full border border-[var(--theme-foreground)] text-[var(--theme-text-primary)] font-medium text-sm transition-colors flex items-center gap-2 hover:bg-[var(--theme-foreground)] hover:text-[var(--theme-background)]"
           >
             <Plus className="w-4 h-4" />
             <span>New Habit</span>
-          </motion.button>
+          </Link>
         </div>
 
         {!mounted || habits.length === 0 ? (
@@ -115,20 +122,18 @@ export default function HabitList({ date }: HabitListProps) {
             </div>
             <p className="text-[var(--theme-text-secondary)] font-medium mb-1">Your journey starts here</p>
             <p className="text-[var(--theme-text-muted)] text-sm mb-6">Add a habit to begin tracking</p>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => router.push('/habits?add=true')}
+            <Link
+              href="/habits?add=true"
               className="px-6 py-2.5 rounded-full bg-[var(--theme-foreground)] text-[var(--theme-background)] font-semibold text-sm hover:opacity-90 transition-opacity"
             >
               Create Habit
-            </motion.button>
+            </Link>
           </motion.div>
         ) : (
           <div className="space-y-4">
             {/* Today's habits */}
             {todaysHabits.length > 0 ? (
-              todaysHabits.map((habit, index) => (
+              todaysHabits.map((habit: Habit, index: number) => (
                 <HabitCard key={habit.id} habit={habit} index={index} date={date} />
               ))
             ) : (
@@ -146,7 +151,7 @@ export default function HabitList({ date }: HabitListProps) {
                   <div className="h-px flex-1 bg-[var(--theme-border)]" />
                 </div>
                 <div className="space-y-4 opacity-60 hover:opacity-100 transition-opacity duration-300">
-                   {otherHabits.map((habit, index) => (
+                   {otherHabits.map((habit: Habit, index: number) => (
                      <HabitCard
                        key={habit.id}
                        habit={habit}

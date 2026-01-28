@@ -19,14 +19,12 @@ const dayLabels: { [key in DayOfWeek]: string } = {
   Sun: 'Sunday',
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function DayEfficiencyChart() {
   const { getDayOfWeekEfficiency, habits, habitLogs } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const efficiency = mounted ? getDayOfWeekEfficiency() : [];
 
@@ -253,8 +251,8 @@ function DayEfficiencyDetail({
                     borderRadius: '8px',
                     color: 'var(--theme-text-primary)'
                   }}
-                  formatter={(value: number | undefined, name: string | undefined, props: { payload?: { completed?: number; total?: number } }) => [
-                    `${value ?? 0}% (${props.payload?.completed ?? 0}/${props.payload?.total ?? 0})`,
+                  formatter={(value: any, name: any, props: any) => [
+                    `${value}% (${props.payload.completed}/${props.payload.total})`,
                     'Completion'
                   ]}
                   labelFormatter={(label) => dayLabels[label as DayOfWeek]}

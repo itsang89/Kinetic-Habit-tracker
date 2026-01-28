@@ -13,14 +13,12 @@ const getHealthStatus = (health: number): { label: string; color: string; bgColo
   return { label: 'Critical', color: 'text-[var(--theme-text-muted)]', bgColor: 'bg-[var(--theme-foreground)]/20' };
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function HabitHealthGrid() {
   const { habits, getHabitHealth } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const habitsWithHealth = mounted 
     ? habits

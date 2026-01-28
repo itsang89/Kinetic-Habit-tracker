@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User } from '@supabase/supabase-js';
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { useKineticStore } from '@/store/useKineticStore';
 
 type AuthContextType = {
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data }: { data: any }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       const session = data.session;
       setUser(session?.user ?? null);
       setLoading(false);
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: any, session: any) => {
+      (_event: AuthChangeEvent, session: Session | null) => {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {

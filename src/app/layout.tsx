@@ -3,6 +3,8 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/components/ToastProvider';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -23,9 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body className={`${outfit.variable} antialiased`}>
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <AuthProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

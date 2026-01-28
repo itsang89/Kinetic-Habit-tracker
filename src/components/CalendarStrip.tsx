@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useKineticStore } from '@/store/useKineticStore';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { useKineticStore, DayOfWeek } from '@/store/useKineticStore';
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -10,14 +10,12 @@ interface CalendarStripProps {
   onDateSelect: (date: Date) => void;
 }
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarStripProps) {
   const { habitLogs, habits } = useKineticStore();
   const [baseDate, setBaseDate] = useState(new Date());
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   const weekDates = useMemo(() => {
     const dates = [];
@@ -48,12 +46,12 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
 
   const isCurrentWeek = useMemo(() => {
     const today = new Date();
-    const startOfWeek = new Date(weekDates[0]);
-    const endOfWeek = new Date(weekDates[6]);
+    const startOfWeek = new Date(weekDates[0] || new Date());
+    const endOfWeek = new Date(weekDates[6] || new Date());
     return today >= startOfWeek && today <= endOfWeek;
   }, [weekDates]);
 
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > 50) {
       goToPreviousWeek();
     } else if (info.offset.x < -50) {
@@ -73,7 +71,7 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
     if (checkDate > today) return 'none';
 
     const dateString = date.toISOString().split('T')[0];
-    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as any;
+    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
     
     // Check if any habit was scheduled for this day AND existed on this day
     const scheduledHabits = habits.filter(h => {
@@ -86,7 +84,7 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
 
     // Check completion
     const completedCount = scheduledHabits.filter(h => 
-      habitLogs.some(l => l.habitId === h.id && l.completedAt.startsWith(dateString))
+      habitLogs.some(l => l.habitId === h.id && l.completedAt.startsWith(dateString || ''))
     ).length;
 
     if (completedCount === scheduledHabits.length) return 'complete';

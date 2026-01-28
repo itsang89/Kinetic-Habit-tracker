@@ -6,14 +6,12 @@ import { useKineticStore } from '@/store/useKineticStore';
 import { useEffect, useState } from 'react';
 import TrendDetailModal from './TrendDetailModal';
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function StreakComparison() {
   const { habits } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   
   // Find habit with highest current streak
   const topHabit = habits.reduce((best, habit) => {

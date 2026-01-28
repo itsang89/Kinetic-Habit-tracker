@@ -7,27 +7,11 @@ import {
   Edit3, Archive, ArchiveRestore, ChevronRight
 } from 'lucide-react';
 import { Habit, HabitIcon, useKineticStore } from '@/store/useKineticStore';
-import { useState, useRef } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const iconMap: Record<HabitIcon, React.ElementType> = {
-  droplet: Droplet,
-  book: Book,
-  brain: Brain,
-  dumbbell: Dumbbell,
-  heart: Heart,
-  sun: Sun,
-  moon: Moon,
-  coffee: Coffee,
-  pencil: Pencil,
-  code: Code,
-  music: Music,
-  leaf: Leaf,
-  target: Target,
-  zap: Zap,
-  star: Star,
-  shield: Shield,
-};
+import { HABIT_ICON_MAP } from '@/lib/habitIcons';
 
 interface HabitManagerCardProps {
   habit: Habit;
@@ -37,7 +21,7 @@ interface HabitManagerCardProps {
   onEdit: () => void;
 }
 
-export default function HabitManagerCard({ 
+function HabitManagerCardComponent({ 
   habit, 
   isSelected, 
   isEditMode, 
@@ -45,12 +29,20 @@ export default function HabitManagerCard({
   onEdit 
 }: HabitManagerCardProps) {
   const router = useRouter();
-  const { getWeeklyHabitData, archiveHabit, unarchiveHabit } = useKineticStore();
+  const { getWeeklyHabitData, archiveHabit, unarchiveHabit, setGlobalModalOpen } = useKineticStore();
   const [showActions, setShowActions] = useState<'left' | 'right' | null>(null);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const isDragging = useRef(false);
+
+  useEffect(() => {
+    if (showArchiveConfirm) {
+      setGlobalModalOpen(true);
+      return () => setGlobalModalOpen(false);
+    }
+  }, [showArchiveConfirm, setGlobalModalOpen]);
   
   const weeklyData = getWeeklyHabitData(habit.id);
-  const Icon = iconMap[habit.icon] || Star;
+  const Icon = HABIT_ICON_MAP[habit.icon] || Star;
   
   const x = useMotionValue(0);
   const background = useTransform(
@@ -72,7 +64,7 @@ export default function HabitManagerCard({
       if (habit.isArchived) {
         await unarchiveHabit(habit.id);
       } else {
-        await archiveHabit(habit.id);
+        setShowArchiveConfirm(true);
       }
     }
     setShowActions(null);
@@ -92,6 +84,9 @@ export default function HabitManagerCard({
     }
   };
 
+  const handleArchive = async () => {
+    await archiveHabit(habit.id);
+  };
   const handleClick = () => {
     if (isDragging.current) return;
     if (isEditMode) {
@@ -218,7 +213,9 @@ export default function HabitManagerCard({
                 whileTap={{ scale: 0.9 }}
                 onClick={async (e) => {
                   e.stopPropagation();
-                  await unarchiveHabit(habit.id);
+                  if (confirm(`Unpause "${habit.name}"?`)) {
+                    await unarchiveHabit(habit.id);
+                  }
                 }}
                 className="p-2 rounded-lg bg-[var(--theme-foreground)]/10 text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/20 transition-colors"
                 title="Unpause Habit"
@@ -260,6 +257,16 @@ export default function HabitManagerCard({
           </span>
         </div>
       </motion.div>
+      <ConfirmDialog
+        isOpen={showArchiveConfirm}
+        onClose={() => setShowArchiveConfirm(false)}
+        onConfirm={handleArchive}
+        title="Pause Habit?"
+        message={`Are you sure you want to pause "${habit.name}"? You can unpause it later.`}
+        confirmLabel="Pause"
+      />
     </motion.div>
   );
 }
+
+export default React.memo(HabitManagerCardComponent);

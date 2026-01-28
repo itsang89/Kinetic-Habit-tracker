@@ -5,15 +5,14 @@ import { Zap, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
 import { useEffect, useState } from 'react';
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function MomentumScore() {
-  const { momentumScore, applyDailyDecay } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const momentumScore = useKineticStore(state => state.momentumScore);
+  const applyDailyDecay = useKineticStore(state => state.applyDailyDecay);
+  const mounted = useMounted();
   const [displayScore, setDisplayScore] = useState(50); // Start with neutral value
   const [trend, setTrend] = useState<'up' | 'down' | 'neutral'>('neutral');
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (mounted) {

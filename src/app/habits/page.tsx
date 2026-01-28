@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
-  Search, Filter, SortAsc, Plus, Trash2, Archive, FolderOpen, 
-  ChevronDown, X, Check, RotateCcw, ArchiveRestore
+  Search, SortAsc, Plus, Trash2, Archive, FolderOpen, 
+  ChevronDown, X, ArchiveRestore
 } from 'lucide-react';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
@@ -13,6 +13,8 @@ import HabitManagerCard from '@/components/habits/HabitManagerCard';
 import EditHabitModal from '@/components/habits/EditHabitModal';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useKineticStore, Habit, HabitCategory } from '@/store/useKineticStore';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { useMounted } from '@/hooks/useMounted';
 
 type FilterType = 'all' | 'active' | 'archived';
 type SortType = 'newest' | 'oldest' | 'streak' | 'health';
@@ -33,7 +35,7 @@ export default function HabitsPage() {
         <div className="min-h-screen pb-28">
           <div className="relative z-10 max-w-2xl mx-auto px-4 pb-12 pt-4">
             <div className="mt-8 flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-[var(--theme-foreground)] border-t-transparent rounded-full animate-spin" />
+              <LoadingSpinner />
             </div>
           </div>
           <BottomNav />
@@ -45,13 +47,15 @@ export default function HabitsPage() {
   );
 }
 
+import ConfirmDialog from '@/components/ConfirmDialog';
+
 function HabitsContent() {
   const { 
     habits, bulkDelete, bulkArchive, bulkUnarchive, 
     bulkChangeCategory, getHabitHealth, setGlobalModalOpen 
   } = useKineticStore();
   const searchParams = useSearchParams();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('newest');
@@ -62,23 +66,17 @@ function HabitsContent() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showArchivedSection, setShowArchivedSection] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   useEffect(() => {
-    if (showSortMenu) {
+    if (showSortMenu || showCategoryMenu || showDeleteConfirm || showArchiveConfirm) {
       setGlobalModalOpen(true);
       return () => setGlobalModalOpen(false);
     }
-  }, [showSortMenu, setGlobalModalOpen]);
+  }, [showSortMenu, showCategoryMenu, showDeleteConfirm, showArchiveConfirm, setGlobalModalOpen]);
 
   useEffect(() => {
-    if (showCategoryMenu) {
-      setGlobalModalOpen(true);
-      return () => setGlobalModalOpen(false);
-    }
-  }, [showCategoryMenu, setGlobalModalOpen]);
-
-  useEffect(() => {
-    setMounted(true);
     if (searchParams.get('add') === 'true') {
       setIsModalOpen(true);
       setEditingHabit(null);
@@ -169,11 +167,9 @@ function HabitsContent() {
 
   const handleBulkDelete = async () => {
     if (selectedHabits.size === 0) return;
-    if (confirm(`Delete ${selectedHabits.size} habit(s)? This cannot be undone.`)) {
-      await bulkDelete(Array.from(selectedHabits));
-      setSelectedHabits(new Set());
-      setIsEditMode(false);
-    }
+    await bulkDelete(Array.from(selectedHabits));
+    setSelectedHabits(new Set());
+    setIsEditMode(false);
   };
 
   const handleBulkArchive = async () => {
@@ -210,7 +206,7 @@ function HabitsContent() {
         <div className="relative z-10 max-w-2xl mx-auto px-4 pb-12 pt-4">
           <Header />
           <div className="mt-8 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-[var(--theme-foreground)] border-t-transparent rounded-full animate-spin" />
+            <LoadingSpinner />
           </div>
         </div>
         <BottomNav />
@@ -367,7 +363,7 @@ function HabitsContent() {
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        onClick={handleBulkArchive}
+                        onClick={() => setShowArchiveConfirm(true)}
                         className="p-2 rounded-full bg-[var(--theme-foreground)]/10 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors"
                         title="Pause selected"
                       >
@@ -423,7 +419,7 @@ function HabitsContent() {
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        onClick={handleBulkDelete}
+                        onClick={() => setShowDeleteConfirm(true)}
                         className="p-2 rounded-full bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 transition-colors"
                         title="Delete selected"
                       >
@@ -543,6 +539,25 @@ function HabitsContent() {
         habit={editingHabit}
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingHabit(null); }}
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Habits?"
+        message={`Are you sure you want to delete ${selectedHabits.size} habit(s)? This action cannot be undone.`}
+        confirmLabel="Delete"
+        isDestructive
+      />
+
+      <ConfirmDialog
+        isOpen={showArchiveConfirm}
+        onClose={() => setShowArchiveConfirm(false)}
+        onConfirm={handleBulkArchive}
+        title="Pause Habits?"
+        message={`Are you sure you want to pause ${selectedHabits.size} habit(s)? You can unpause them later.`}
+        confirmLabel="Pause"
       />
     </div>
   );

@@ -1,7 +1,35 @@
-import { supabase } from './supabase';
-import type { Habit, HabitLog, MoodLog } from '@/store/useKineticStore';
+import { supabase, Database } from './supabase';
+import type { Habit, HabitLog, MoodLog, HabitIcon, Theme, DayOfWeek, HabitCategory } from '@/store/useKineticStore';
 
-export async function syncToCloud(userId: string, state: any) {
+type HabitRow = Database['public']['Tables']['habits']['Row'];
+type HabitLogRow = Database['public']['Tables']['habit_logs']['Row'];
+type MoodLogRow = Database['public']['Tables']['mood_logs']['Row'];
+
+export interface SyncState {
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  moodLogs: MoodLog[];
+  userName: string;
+  userIcon: HabitIcon;
+  theme: Theme;
+}
+
+export interface SyncResult {
+  success: boolean;
+  error?: Error;
+  data?: {
+    habits: Habit[];
+    habitLogs: HabitLog[];
+    moodLogs: MoodLog[];
+    profile: {
+      userName: string;
+      userIcon: HabitIcon;
+      theme: Theme;
+    } | null;
+  };
+}
+
+export async function syncToCloud(userId: string, state: SyncState): Promise<SyncResult> {
   try {
     // Skip if supabase is not available
     if (!supabase) {
@@ -78,13 +106,13 @@ export async function syncToCloud(userId: string, state: any) {
     if (profileError) throw profileError;
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Sync error details:', error);
-    return { success: false, error };
+    return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
   }
 }
 
-export async function fetchFromCloud(userId: string) {
+export async function fetchFromCloud(userId: string): Promise<SyncResult> {
   try {
     // Skip if supabase is not available
     if (!supabase) {
@@ -103,36 +131,42 @@ export async function fetchFromCloud(userId: string) {
       supabase.from('user_profiles').select('*').eq('id', userId).single()
     ]);
 
-    if (hErr || lErr || mErr) throw (hErr || lErr || mErr);
+    if (hErr || lErr || mErr || pErr) {
+      const error = hErr || lErr || mErr || pErr;
+      throw error;
+    }
 
     return {
       success: true,
       data: {
-        habits: habits?.map((h: any) => ({
+        habits: (habits as HabitRow[] || []).map((h) => ({
           ...h,
           bestStreak: h.best_streak,
           isArchived: h.is_archived,
-          createdAt: h.created_at
-        })) || [],
-        habitLogs: logs?.map((l: any) => ({
+          createdAt: h.created_at,
+          shieldAvailable: true,
+          schedule: h.schedule as DayOfWeek[],
+          category: h.category as HabitCategory,
+          icon: h.icon as HabitIcon
+        })),
+        habitLogs: (logs as HabitLogRow[] || []).map((l) => ({
           ...l,
           habitId: l.habit_id,
           completedAt: l.completed_at
-        })) || [],
-        moodLogs: moods?.map((m: any) => ({
+        })),
+        moodLogs: (moods as MoodLogRow[] || []).map((m) => ({
           ...m,
           loggedAt: m.logged_at
-        })) || [],
+        })),
         profile: profile ? {
           userName: profile.user_name,
-          userIcon: profile.user_icon,
-          theme: profile.theme
+          userIcon: profile.user_icon as HabitIcon,
+          theme: profile.theme as Theme
         } : null
       }
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Fetch error details:', error);
-    return { success: false, error };
+    return { success: false, error: error instanceof Error ? error : new Error(String(error)) };
   }
 }
-

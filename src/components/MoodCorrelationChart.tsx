@@ -12,16 +12,16 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  TooltipProps,
 } from 'recharts';
 import { useState, useEffect } from 'react';
+import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
+import { useMounted } from '@/hooks/useMounted';
 
 export default function MoodCorrelationChart() {
   const { getMoodCorrelationData, moodLogs, habits } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   const data = mounted ? getMoodCorrelationData() : [];
 
@@ -36,12 +36,12 @@ export default function MoodCorrelationChart() {
     if (active && payload && payload.length) {
       return (
         <div className="bg-black border border-white/20 p-3 rounded-xl shadow-xl backdrop-blur-md">
-          <p className="text-neutral-400 text-xs mb-2 font-medium uppercase tracking-wider">{formatDate(label || '')}</p>
+          <p className="text-neutral-400 text-xs mb-2 font-medium uppercase tracking-wider">{formatDate(String(label || ''))}</p>
           {payload.map((item: any, index: number) => (
             <div key={index} className="flex items-center gap-2 mb-1">
                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                <p className="text-sm font-medium text-white">
-                  {item.name}: {Math.round(item.value)}%
+                  {item.name}: {Math.round(Number(item.value))}%
                </p>
             </div>
           ))}

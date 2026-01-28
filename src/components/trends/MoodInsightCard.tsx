@@ -8,14 +8,12 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, S
 import TrendDetailModal from './TrendDetailModal';
 import ChartContainer from '@/components/ui/ChartContainer';
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function MoodInsightCard() {
   const { getMoodHabitInsight, moodLogs, habits, habitLogs } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const insight = mounted ? getMoodHabitInsight() : null;
 
@@ -27,7 +25,7 @@ export default function MoodInsightCard() {
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date.toISOString().split('T')[0] || '';
       const log = moodLogs.find(m => m.loggedAt.startsWith(dateString));
       const dayCompletions = habitLogs.filter(l => l.completedAt.startsWith(dateString)).length;
       
@@ -62,7 +60,7 @@ export default function MoodInsightCard() {
     for (let i = 13; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date.toISOString().split('T')[0] || '';
       const log = moodLogs.find(m => m.loggedAt.startsWith(dateString));
       
       last14Days.push({

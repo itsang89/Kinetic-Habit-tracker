@@ -3,6 +3,11 @@ import { persist } from 'zustand/middleware';
 import { syncToCloud, fetchFromCloud } from '@/lib/sync';
 import { supabase } from '@/lib/supabase';
 
+import { MOMENTUM_CONSTANTS } from '@/lib/constants';
+
+// Define a module-level variable for sync timeout
+let syncTimeout: NodeJS.Timeout | null = null;
+
 export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 
 export type HabitCategory = 'health' | 'learning' | 'productivity' | 'mindfulness' | 'fitness' | 'other';
@@ -135,12 +140,118 @@ const generateId = () => {
 };
 
 const getDateString = (date: Date = new Date()) => {
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
 };
 
 const getDayOfWeek = (date: Date = new Date()): DayOfWeek => {
   const days: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return days[date.getDay()];
+  return days[date.getDay()] ?? 'Mon';
+};
+
+// Helper function to recalculate streak and best streak for a habit
+const recalculateStreak = (habit: Habit, habitLogs: HabitLog[], upToDate?: string): { streak: number; bestStreak: number } => {
+  const today = new Date();
+  const endDate = upToDate ? new Date(upToDate + 'T23:59:59') : today;
+  endDate.setHours(23, 59, 59, 999);
+  
+  const habitCreatedAt = new Date(habit.createdAt);
+  habitCreatedAt.setHours(0, 0, 0, 0);
+  
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+  
+  // Iterate from habit creation date to end date (or today)
+  const startDate = habitCreatedAt > endDate ? endDate : habitCreatedAt;
+  const checkDate = new Date(startDate);
+  
+  while (checkDate <= endDate) {
+    const dateString = getDateString(checkDate);
+    const dayOfWeek = getDayOfWeek(checkDate);
+    
+    // Only check days when habit is scheduled
+    if (habit.schedule.includes(dayOfWeek)) {
+      const log = habitLogs.find(
+        (l) => l.habitId === habit.id && l.completedAt.startsWith(dateString)
+      );
+      
+      const isCompleted = log ? (log.value / habit.target) >= 1 : false;
+      
+      if (isCompleted) {
+        tempStreak++;
+        maxStreak = Math.max(maxStreak, tempStreak);
+        
+        // Current streak is the streak ending at the end date
+        if (dateString === getDateString(endDate) || (upToDate && dateString === upToDate)) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        // If this is before the end date, reset temp streak
+        if (checkDate < endDate) {
+          tempStreak = 0;
+        } else {
+          // If we're at the end date and it's not completed, current streak is 0
+          currentStreak = 0;
+        }
+      }
+    }
+    
+    checkDate.setDate(checkDate.getDate() + 1);
+  }
+  
+  // If we didn't find a current streak (end date wasn't a scheduled day), 
+  // calculate from the most recent scheduled day
+  if (currentStreak === 0 && !upToDate) {
+    const recentDate = new Date(endDate);
+    recentDate.setDate(recentDate.getDate() - 7); // Look back 7 days
+    
+    while (recentDate <= endDate) {
+      const dateString = getDateString(recentDate);
+      const dayOfWeek = getDayOfWeek(recentDate);
+      
+      if (habit.schedule.includes(dayOfWeek)) {
+        const log = habitLogs.find(
+          (l) => l.habitId === habit.id && l.completedAt.startsWith(dateString)
+        );
+        
+        if (log && (log.value / habit.target) >= 1) {
+          // Count backwards to find current streak
+          let streakCount = 0;
+          let checkBackDate = new Date(recentDate);
+          
+          while (checkBackDate >= habitCreatedAt) {
+            const backDateString = getDateString(checkBackDate);
+            const backDayOfWeek = getDayOfWeek(checkBackDate);
+            
+            if (habit.schedule.includes(backDayOfWeek)) {
+              const backLog = habitLogs.find(
+                (l) => l.habitId === habit.id && l.completedAt.startsWith(backDateString)
+              );
+              
+              if (backLog && (backLog.value / habit.target) >= 1) {
+                streakCount++;
+                checkBackDate.setDate(checkBackDate.getDate() - 1);
+              } else {
+                break;
+              }
+            } else {
+              checkBackDate.setDate(checkBackDate.getDate() - 1);
+            }
+          }
+          
+          currentStreak = streakCount;
+          break;
+        }
+      }
+      
+      recentDate.setDate(recentDate.getDate() + 1);
+    }
+  }
+  
+  return {
+    streak: currentStreak,
+    bestStreak: Math.max(habit.bestStreak || 0, maxStreak)
+  };
 };
 
 export const useKineticStore = create<KineticState>()(
@@ -151,9 +262,9 @@ export const useKineticStore = create<KineticState>()(
       habits: [],
       habitLogs: [],
       moodLogs: [],
-      momentumScore: 50,
+      momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
       lastDecayDate: null,
-      previousWeekMomentum: 50,
+      previousWeekMomentum: MOMENTUM_CONSTANTS.INITIAL_SCORE,
       lastSyncedAt: null,
       isSyncing: false,
       syncError: null,
@@ -273,12 +384,11 @@ export const useKineticStore = create<KineticState>()(
         
         let logs = [...state.habitLogs];
         
-        const wasCompletedBefore = existingLogIndex >= 0 && (state.habitLogs[existingLogIndex].value / habit.target) >= 1;
-        const oldValue = existingLogIndex >= 0 ? state.habitLogs[existingLogIndex].value : 0;
+        const existingLog = existingLogIndex >= 0 ? state.habitLogs[existingLogIndex] : undefined;
+        const oldValue = existingLog ? existingLog.value : 0;
 
-        if (existingLogIndex >= 0) {
+        if (existingLogIndex >= 0 && existingLog) {
             // Update existing log
-            const existingLog = logs[existingLogIndex];
             logs[existingLogIndex] = { ...existingLog, value };
         } else {
             // New log
@@ -290,37 +400,25 @@ export const useKineticStore = create<KineticState>()(
             });
         }
         
-        // Calculate new streak
-        const updatedLogValue = value;
-        const isNowCompleted = (updatedLogValue / habit.target) >= 1;
-        const isCurrentDay = targetDate === getDateString();
-        
-        let newStreak = habit.streak;
-        
-        if (isCurrentDay) {
-           const baseStreak = wasCompletedBefore ? Math.max(0, habit.streak - 1) : habit.streak;
-           
-           if (isNowCompleted) {
-             newStreak = baseStreak + 1;
-           } else {
-             newStreak = baseStreak;
-           }
-        }
-
-        const newBestStreak = Math.max(habit.bestStreak || 0, newStreak);
+        // Recalculate streak and best streak properly
+        // Use the updated logs array for calculation
+        const updatedLogs = logs;
+        const streakData = recalculateStreak(habit, updatedLogs, targetDate);
+        const newStreak = streakData.streak;
+        const newBestStreak = streakData.bestStreak;
 
         // Momentum Logic: Proportional Credit
         const oldPercent = Math.min(1, oldValue / habit.target);
-        const newPercent = Math.min(1, updatedLogValue / habit.target);
+        const newPercent = Math.min(1, value / habit.target);
         const deltaPercent = newPercent - oldPercent;
-        const momentumChange = deltaPercent * 5; // 5 points for full completion
+        const momentumChange = deltaPercent * MOMENTUM_CONSTANTS.FULL_COMPLETION_BONUS;
 
         set((state) => ({
             habitLogs: logs,
             habits: state.habits.map((h) =>
               h.id === habitId ? { ...h, streak: newStreak, bestStreak: newBestStreak } : h
             ),
-            momentumScore: Math.min(100, Math.max(0, state.momentumScore + momentumChange)),
+            momentumScore: Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore + momentumChange)),
         }));
         await get().syncToCloud();
       },
@@ -337,21 +435,20 @@ export const useKineticStore = create<KineticState>()(
 
         const habit = state.habits.find((h) => h.id === habitId);
         if (habit) {
-          const isCurrentDay = targetDate === getDateString();
-          // If removing, we revert streak if it counted
-          const wasCompleted = (logToRemove.value / habit.target) >= 1;
-          const newStreak = (isCurrentDay && wasCompleted) ? Math.max(0, habit.streak - 1) : habit.streak;
+          // Remove the log first, then recalculate streaks
+          const updatedLogs = state.habitLogs.filter((l) => l.id !== logToRemove.id);
+          const streakData = recalculateStreak(habit, updatedLogs, targetDate);
           
           // Remove proportional momentum
           const percentRemoved = Math.min(1, logToRemove.value / habit.target);
-          const momentumChange = percentRemoved * 5;
+          const momentumChange = percentRemoved * MOMENTUM_CONSTANTS.FULL_COMPLETION_BONUS;
 
           set((state) => ({
-            habitLogs: state.habitLogs.filter((l) => l.id !== logToRemove.id),
+            habitLogs: updatedLogs,
             habits: state.habits.map((h) =>
-              h.id === habitId ? { ...h, streak: newStreak } : h
+              h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
             ),
-            momentumScore: Math.max(0, state.momentumScore - momentumChange),
+            momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - momentumChange),
           }));
           await get().syncToCloud();
         }
@@ -396,14 +493,29 @@ export const useKineticStore = create<KineticState>()(
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        set({ isSyncing: true, syncError: null });
-        const result = await syncToCloud(user.id, get());
-        
-        if (result.success) {
-          set({ lastSyncedAt: new Date().toISOString(), isSyncing: false });
-        } else {
-          set({ syncError: (result.error as any)?.message || 'Sync failed', isSyncing: false });
+        // Clear any existing timeout
+        if (syncTimeout) {
+          clearTimeout(syncTimeout);
         }
+
+        // Set new timeout for debounced sync
+        syncTimeout = setTimeout(async () => {
+          set({ isSyncing: true, syncError: null });
+          try {
+            const result = await syncToCloud(user.id, get());
+            
+            if (result.success) {
+              set({ lastSyncedAt: new Date().toISOString(), isSyncing: false });
+            } else {
+              const errorMsg = result.error?.message || 'Sync failed';
+              set({ syncError: errorMsg, isSyncing: false });
+            }
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Sync failed';
+            set({ syncError: errorMsg, isSyncing: false });
+          }
+          syncTimeout = null;
+        }, MOMENTUM_CONSTANTS.SYNC_DEBOUNCE_MS);
       },
 
       fetchFromCloud: async () => {
@@ -426,15 +538,21 @@ export const useKineticStore = create<KineticState>()(
             isSyncing: false
           });
         } else {
-          set({ syncError: (result.error as any)?.message || 'Fetch failed', isSyncing: false });
+          const errorMsg = result.error?.message || 'Fetch failed';
+          set({ syncError: errorMsg, isSyncing: false });
         }
       },
 
       initializeStore: async () => {
+        // Apply daily decay first to ensure data is up to date
+        get().applyDailyDecay();
+        
         if (!supabase) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await get().fetchFromCloud();
+          // Apply decay again after fetching in case decay wasn't applied on other device
+          get().applyDailyDecay();
         }
       },
 
@@ -490,6 +608,12 @@ export const useKineticStore = create<KineticState>()(
         const missedHabits = state.habits.filter((habit) => {
           if (!habit.schedule.includes(dayOfWeek)) return false;
           
+          // If shield was used, don't count as missed
+          if (habit.shieldAvailable === false) {
+            // Shield was used - restore it for next time and don't count as missed
+            return false;
+          }
+          
           const log = state.habitLogs.find(
             (log) => log.habitId === habit.id && log.completedAt.startsWith(yesterdayString)
           );
@@ -501,9 +625,14 @@ export const useKineticStore = create<KineticState>()(
           return percent < 50; // Missed if < 50%
         });
 
-        const decayAmount = missedHabits.length * 3;
+        const decayAmount = missedHabits.length * MOMENTUM_CONSTANTS.SCORE_INCREMENT;
         
         const updatedHabits = state.habits.map((habit) => {
+          // If shield was used, restore it and don't reset streak
+          if (habit.shieldAvailable === false) {
+            return { ...habit, shieldAvailable: true };
+          }
+          
           if (missedHabits.find((m) => m.id === habit.id)) {
              // Reset streak if missed (and < 50%)
             return { ...habit, streak: 0 };
@@ -512,7 +641,7 @@ export const useKineticStore = create<KineticState>()(
         });
 
         set({
-          momentumScore: Math.max(0, state.momentumScore - decayAmount),
+          momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - decayAmount - MOMENTUM_CONSTANTS.DAILY_DECAY),
           habits: updatedHabits,
           lastDecayDate: today,
         });
@@ -578,7 +707,7 @@ export const useKineticStore = create<KineticState>()(
 
       getWeeklyHabitData: (habitId) => {
         const state = get();
-        const data = [];
+        const data: { date: string; completed: boolean }[] = [];
         const habit = state.habits.find((h) => h.id === habitId);
         
         for (let i = 6; i >= 0; i--) {
@@ -596,7 +725,7 @@ export const useKineticStore = create<KineticState>()(
 
       getYearlyHabitData: (habitId) => {
         const state = get();
-        const data = [];
+        const data: { date: string; count: number }[] = [];
         for (let i = 364; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
@@ -730,7 +859,8 @@ export const useKineticStore = create<KineticState>()(
         
         state.habitLogs.forEach((log) => {
           const hour = new Date(log.completedAt).getHours();
-          hourCounts[hour]++;
+          const currentCount = hourCounts[hour] || 0;
+          hourCounts[hour] = currentCount + 1;
         });
         
         return Object.entries(hourCounts).map(([hour, count]) => ({
@@ -780,8 +910,27 @@ export const useKineticStore = create<KineticState>()(
 
       getWeeklySummary: () => {
         const state = get();
+        const today = new Date();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
+        
+        // Update previousWeekMomentum if it's a new week (e.g., Sunday)
+        // Store the last update date in a separate field or check if it's been a week
+        const lastUpdateKey = 'lastWeeklyMomentumUpdate';
+        const lastUpdate = typeof window !== 'undefined' ? localStorage.getItem(lastUpdateKey) : null;
+        const lastUpdateDate = lastUpdate ? new Date(lastUpdate) : null;
+        const daysSinceUpdate = lastUpdateDate 
+          ? Math.floor((today.getTime() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+        
+        // Update if it's been 7+ days or if it's Sunday and we haven't updated this week
+        const isSunday = today.getDay() === 0;
+        const shouldUpdate = daysSinceUpdate >= 7 || (isSunday && (!lastUpdateDate || lastUpdateDate.getDay() !== 0));
+        
+        if (shouldUpdate && typeof window !== 'undefined') {
+          set({ previousWeekMomentum: state.momentumScore });
+          localStorage.setItem(lastUpdateKey, today.toISOString());
+        }
         
         // Get completions this week
         const weekLogs = state.habitLogs.filter(
@@ -916,7 +1065,7 @@ export const useKineticStore = create<KineticState>()(
           const completionDates = new Set(
             state.habitLogs
               .filter((log) => log.habitId === habit.id && (log.value / habit.target) >= 0.5) // Consider meaningful interaction
-              .map((log) => log.completedAt.split('T')[0])
+              .map((log) => log.completedAt.split('T')[0] || '')
           );
           
           let completionMoodSum = 0;
@@ -925,7 +1074,7 @@ export const useKineticStore = create<KineticState>()(
           let nonCompletionMoodCount = 0;
           
           state.moodLogs.forEach((moodLog) => {
-            const moodDate = moodLog.loggedAt.split('T')[0];
+            const moodDate = moodLog.loggedAt.split('T')[0] || '';
             if (completionDates.has(moodDate)) {
               completionMoodSum += moodLog.score;
               completionMoodCount++;
@@ -992,9 +1141,9 @@ export const useKineticStore = create<KineticState>()(
           habits: [],
           habitLogs: [],
           moodLogs: [],
-          momentumScore: 50,
+          momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
           lastDecayDate: null,
-          previousWeekMomentum: 50,
+          previousWeekMomentum: MOMENTUM_CONSTANTS.INITIAL_SCORE,
         });
       },
 
@@ -1004,6 +1153,7 @@ export const useKineticStore = create<KineticState>()(
         const oldestHabit = state.habits.reduce((oldest, habit) => 
           new Date(habit.createdAt) < new Date(oldest.createdAt) ? habit : oldest
         );
+        if (!oldestHabit) return 'Recently joined';
         return new Date(oldestHabit.createdAt).toLocaleDateString('en-US', { 
           month: 'long', 
           year: 'numeric' 

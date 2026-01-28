@@ -3,9 +3,10 @@
 import { motion } from 'framer-motion';
 import { Clock, Sunrise, Sun, Moon, Expand } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar, CartesianGrid } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar, CartesianGrid, TooltipProps } from 'recharts';
 import { useEffect, useState } from 'react';
 import TrendDetailModal from './TrendDetailModal';
+import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 
 const formatHour = (hour: number): string => {
   if (hour === 0) return '12am';
@@ -20,14 +21,12 @@ const getTimeOfDayIcon = (hour: number) => {
   return Moon;
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function TimePerformanceChart() {
   const { getTimeOfDayPerformance, habitLogs, habits } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const performance = mounted ? getTimeOfDayPerformance() : [];
 
@@ -69,11 +68,11 @@ export default function TimePerformanceChart() {
   const PeakIcon = peakHour ? getTimeOfDayIcon(peakHour.hour) : Clock;
 
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload && payload.length && payload[0]) {
       const data = payload[0].payload;
       return (
         <div className="bg-[var(--theme-background)] border border-[var(--theme-border)] p-3 rounded-xl">
-          <p className="text-[var(--theme-text-primary)] font-medium">{formatHour(data.hour)}</p>
+          <p className="text-[var(--theme-text-primary)] font-medium">{formatHour(Number(data.hour))}</p>
           <p className="text-[var(--theme-text-secondary)] text-sm">{data.count} completions</p>
         </div>
       );
@@ -209,8 +208,10 @@ export default function TimePerformanceChart() {
                 { label: 'Afternoon', icon: Sun, range: [12, 18], color: 'text-[var(--theme-text-secondary)]' },
                 { label: 'Evening', icon: Moon, range: [18, 24], color: 'text-[var(--theme-text-tertiary)]' },
               ].map(block => {
-                const blockCount = performance
-                  .filter(p => p.hour >= block.range[0] && p.hour < block.range[1])
+                const range = block.range;
+                const blockValues = performance
+                  .filter(p => p.hour >= (range[0] ?? 0) && p.hour < (range[1] ?? 24));
+                const blockCount = blockValues
                   .reduce((sum, p) => sum + p.count, 0);
                 const percentage = totalCompletions > 0 ? Math.round((blockCount / totalCompletions) * 100) : 0;
                 const Icon = block.icon;

@@ -7,6 +7,7 @@ import {
   Sun, 
   Moon, 
   Download, 
+  Upload,
   FileJson, 
   FileSpreadsheet,
   Shield, 
@@ -31,32 +32,9 @@ import {
   Zap,
   Star
 } from 'lucide-react';
-import { useKineticStore, HabitIcon } from '@/store/useKineticStore';
+import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog } from '@/store/useKineticStore';
 
-const iconMap: Record<HabitIcon, React.ElementType> = {
-  droplet: Droplet,
-  book: Book,
-  brain: Brain,
-  dumbbell: Dumbbell,
-  heart: Heart,
-  sun: Sun,
-  moon: Moon,
-  coffee: Coffee,
-  pencil: Pencil,
-  code: Code,
-  music: Music,
-  leaf: Leaf,
-  target: Target,
-  zap: Zap,
-  star: Star,
-  shield: Shield,
-};
-
-const iconOptions: HabitIcon[] = [
-  'droplet', 'book', 'brain', 'dumbbell', 'heart', 
-  'sun', 'moon', 'coffee', 'pencil', 'code', 
-  'music', 'leaf', 'target', 'zap', 'star', 'shield'
-];
+import { HABIT_ICON_MAP, HABIT_ICON_OPTIONS } from '@/lib/habitIcons';
 import BottomNav from '@/components/BottomNav';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -64,25 +42,31 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Cloud, CloudOff, RefreshCcw } from 'lucide-react';
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function ProfilePage() {
+  const store = useKineticStore();
   const { 
     theme, setTheme, getExportData, clearAllData, getJoinDate, 
     habits, habitLogs, moodLogs, userName, userIcon, updateUserProfile,
-    lastSyncedAt, isSyncing, syncToCloud
-  } = useKineticStore();
+    lastSyncedAt, isSyncing, syncToCloud, addHabit, logHabitCompletion, logMood
+  } = store;
   
   const { user, signOut } = useAuth();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editName, setEditName] = useState(userName);
   const [editIcon, setEditIcon] = useState(userIcon);
   const [joinDate, setJoinDate] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    setJoinDate(getJoinDate());
-  }, [getJoinDate]);
+    if (mounted) {
+      setJoinDate(getJoinDate());
+    }
+  }, [getJoinDate, mounted]);
 
   useEffect(() => {
     if (userName) setEditName(userName);
@@ -94,7 +78,7 @@ export default function ProfilePage() {
     setShowEditProfile(false);
   };
 
-  const UserIconComponent = iconMap[userIcon] || Star;
+  const UserIconComponent = HABIT_ICON_MAP[userIcon] || Star;
 
   const exportAsJSON = () => {
     const data = getExportData();
@@ -107,6 +91,110 @@ export default function ProfilePage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const importData = async (file: File) => {
+    setImportError(null);
+    setImportSuccess(false);
+    
+    try {
+      const text = await file.text();
+      
+      if (file.name.endsWith('.json')) {
+        const data = JSON.parse(text) as {
+          habits: Habit[];
+          habitLogs: HabitLog[];
+          moodLogs: MoodLog[];
+        };
+        
+        // Validate data structure
+        if (!data.habits || !Array.isArray(data.habits)) {
+          throw new Error('Invalid JSON format: missing or invalid habits array');
+        }
+        if (!data.habitLogs || !Array.isArray(data.habitLogs)) {
+          throw new Error('Invalid JSON format: missing or invalid habitLogs array');
+        }
+        if (!data.moodLogs || !Array.isArray(data.moodLogs)) {
+          throw new Error('Invalid JSON format: missing or invalid moodLogs array');
+        }
+        
+        // Clear existing data
+        clearAllData();
+        
+        // Import habits
+        for (const habit of data.habits) {
+          await addHabit({
+            name: habit.name || 'Imported Habit',
+            unit: habit.unit || 'times',
+            target: habit.target || 1,
+            schedule: habit.schedule || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            category: habit.category || 'other',
+            icon: habit.icon || 'star',
+            type: habit.type || 'simple',
+          });
+        }
+        
+        // Wait a moment for state to update, then match habits by name
+        // Since habits are added one by one, we need to get the updated list
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Re-fetch habits from the store after import
+        const habitIdMap = new Map<string, string>();
+        const currentHabitsAfterImport = store.habits;
+        
+        // Match old habits to new habits by name and schedule (simple approach)
+        data.habits.forEach((oldHabit) => {
+          const matchingHabit = currentHabitsAfterImport.find(
+            h => h.name === oldHabit.name && 
+                 JSON.stringify([...h.schedule].sort()) === JSON.stringify([...(oldHabit.schedule || [])].sort())
+          );
+          if (matchingHabit) {
+            habitIdMap.set(oldHabit.id, matchingHabit.id);
+          }
+        });
+        
+        // Import habit logs using the ID mapping
+        for (const log of data.habitLogs) {
+          const newHabitId = habitIdMap.get(log.habitId);
+          if (newHabitId) {
+            const date = log.completedAt?.split('T')[0];
+            if (date) {
+              await logHabitCompletion(newHabitId, log.value || 1, date);
+            }
+          }
+        }
+        
+        // Import mood logs
+        for (const mood of data.moodLogs) {
+          const date = mood.loggedAt?.split('T')[0];
+          if (date && mood.score >= 1 && mood.score <= 10) {
+            await logMood(mood.score, date);
+          }
+        }
+        
+        setImportSuccess(true);
+        setTimeout(() => setImportSuccess(false), 3000);
+      } else {
+        throw new Error('Unsupported file format. Please import a JSON file.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to import data';
+      setImportError(message);
+      setTimeout(() => setImportError(null), 5000);
+    }
+  };
+
+  const handleImportClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        importData(file);
+      }
+    };
+    input.click();
   };
 
   const exportAsCSV = () => {
@@ -344,7 +432,10 @@ export default function ProfilePage() {
               </button>
 
               {/* Privacy */}
-              <div className="flex items-center justify-between p-4">
+              <button
+                onClick={() => alert('Privacy Policy\n\nAll your data is stored locally in your browser. When you sign in, data is synced to Supabase (encrypted in transit and at rest).\n\nWe do not share your data with third parties. Your habits, logs, and mood entries are private to you.')}
+                className="w-full flex items-center justify-between p-4 hover:bg-[var(--theme-foreground)]/5 transition-colors"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[var(--theme-foreground)]/10 flex items-center justify-center">
                     <Shield className="w-4 h-4 text-[var(--theme-text-primary)]" />
@@ -355,7 +446,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-[var(--theme-text-secondary)]" />
-              </div>
+              </button>
             </div>
           </motion.div>
 
@@ -499,15 +590,15 @@ export default function ProfilePage() {
                       Choose Icon
                     </label>
                     <div className="grid grid-cols-5 gap-2">
-                      {iconOptions.map((icon) => {
-                        const IconComp = iconMap[icon];
+                      {HABIT_ICON_OPTIONS.map((option) => {
+                        const IconComp = option.component;
                         return (
                           <button
-                            key={icon}
-                            onClick={() => setEditIcon(icon)}
+                            key={option.icon}
+                            onClick={() => setEditIcon(option.icon)}
                             className={`
                               p-3 rounded-xl transition-all
-                              ${editIcon === icon 
+                              ${editIcon === option.icon 
                                 ? 'bg-[var(--theme-foreground)] text-[var(--theme-background)]' 
                                 : 'bg-[var(--theme-foreground)]/5 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
                               }

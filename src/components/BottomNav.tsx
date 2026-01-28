@@ -15,7 +15,7 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { modalCount } = useKineticStore();
+  const modalCount = useKineticStore(state => state.modalCount);
 
   return (
     <AnimatePresence>

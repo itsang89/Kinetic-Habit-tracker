@@ -9,16 +9,14 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianG
 
 type PaperChainData = { date: string; complete: boolean; partial: boolean; completionRate: number };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function PaperChain() {
   const { getPaperChainData, habits } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [chainLength, setChainLength] = useState(0);
   const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const chainData = mounted ? getPaperChainData(30) : [];
   const fullChainData = mounted ? getPaperChainData(90) : []; // 90 days for full view
@@ -27,7 +25,8 @@ export default function PaperChain() {
   useEffect(() => {
     let length = 0;
     for (let i = chainData.length - 1; i >= 0; i--) {
-      if (chainData[i].complete) {
+      const day = chainData[i];
+      if (day && day.complete) {
         length++;
       } else {
         break;
@@ -318,9 +317,12 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
         <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">Weekly Breakdown</h3>
         <div className="space-y-3">
           {weeks.map((week, weekIndex) => {
-            const weekAvg = week.reduce((sum, d) => sum + d.completionRate, 0) / week.length;
-            const prevWeekAvg = weekIndex > 0 
-              ? weeks[weekIndex - 1].reduce((sum, d) => sum + d.completionRate, 0) / weeks[weekIndex - 1].length 
+            const dayValue = weeks[weekIndex];
+            if (!dayValue) return null;
+            const weekAvg = dayValue.reduce((sum, d) => sum + d.completionRate, 0) / dayValue.length;
+            const prevWeek = weeks[weekIndex - 1];
+            const prevWeekAvg = weekIndex > 0 && prevWeek
+              ? prevWeek.reduce((sum, d) => sum + d.completionRate, 0) / prevWeek.length 
               : weekAvg;
             const trend = weekAvg - prevWeekAvg;
 
@@ -349,8 +351,8 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
                         ${day.complete 
                           ? 'bg-white text-black' 
                           : day.partial 
-                            ? 'bg-neutral-700 text-neutral-300' 
-                            : 'bg-neutral-900 text-neutral-600'
+                          ? 'bg-neutral-700 text-neutral-300' 
+                          : 'bg-neutral-900 text-neutral-600'
                         }
                       `}
                       title={`${formatDate(day.date)}: ${Math.round(day.completionRate)}%`}

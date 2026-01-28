@@ -1,0 +1,15 @@
+export const MOMENTUM_CONSTANTS = {
+  FULL_COMPLETION_BONUS: 5,
+  SCORE_INCREMENT: 3,
+  SCORE_DECREMENT: 5,
+  MAX_SCORE: 100,
+  MIN_SCORE: 0,
+  INITIAL_SCORE: 50,
+  DAILY_DECAY: 2,
+  SYNC_DEBOUNCE_MS: 2000,
+} as const;
+
+export const APP_METADATA = {
+  NAME: 'Kinetic',
+  VERSION: '1.0.0',
+};

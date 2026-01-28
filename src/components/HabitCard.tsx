@@ -3,7 +3,8 @@
 import { motion } from 'framer-motion';
 import { Check, Shield, Flame, Trash2 } from 'lucide-react';
 import { Habit, useKineticStore } from '@/store/useKineticStore';
-import { useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import React, { useState, useEffect } from 'react';
 import KineticSlider from './habits/KineticSlider';
 import MultiTapCapacitor from './habits/MultiTapCapacitor';
 
@@ -13,14 +14,22 @@ interface HabitCardProps {
   date?: string; // Format: YYYY-MM-DD
 }
 
-export default function HabitCard({ habit, index, date }: HabitCardProps) {
-  const { logHabitCompletion, removeHabitCompletion, getHabitProgress, useShield, deleteHabit } = useKineticStore();
-  const targetDate = date || new Date().toISOString().split('T')[0];
+function HabitCardComponent({ habit, index, date }: HabitCardProps) {
+  const { logHabitCompletion, removeHabitCompletion, getHabitProgress, useShield, deleteHabit, setGlobalModalOpen } = useKineticStore();
+  const targetDate = date || new Date().toISOString().split('T')[0] || '';
   
-  const { current, target, percent } = getHabitProgress(habit.id, targetDate);
+  const { current, percent } = getHabitProgress(habit.id, targetDate);
   const isCompleted = percent >= 100;
   
   const [showDelete, setShowDelete] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (showDeleteConfirm) {
+      setGlobalModalOpen(true);
+      return () => setGlobalModalOpen(false);
+    }
+  }, [showDeleteConfirm, setGlobalModalOpen]);
 
   const handleToggleComplete = async () => {
     // allow one tap completion for simple, duration, and count habits
@@ -40,8 +49,7 @@ export default function HabitCard({ habit, index, date }: HabitCardProps) {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async () => {
     await deleteHabit(habit.id);
   };
 
@@ -149,7 +157,7 @@ export default function HabitCard({ habit, index, date }: HabitCardProps) {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: showDelete ? 1 : 0, scale: showDelete ? 1 : 0.8 }}
             whileHover={{ scale: 1.1 }}
-            onClick={handleDelete}
+            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/10 transition-all"
           >
             <Trash2 className="w-4 h-4" />
@@ -191,6 +199,18 @@ export default function HabitCard({ habit, index, date }: HabitCardProps) {
             className="absolute inset-0 bg-gradient-to-r from-[var(--theme-foreground)]/[0.05] to-transparent pointer-events-none"
          />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Habit?"
+        message={`Are you sure you want to delete "${habit.name}"? This will also delete all associated logs. This action cannot be undone.`}
+        confirmLabel="Delete"
+        isDestructive
+      />
     </motion.div>
   );
 }
+
+export default React.memo(HabitCardComponent);

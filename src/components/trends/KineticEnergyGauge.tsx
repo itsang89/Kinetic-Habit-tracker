@@ -16,15 +16,13 @@ const getMotivationalMessage = (score: number): string => {
   return "Get moving";
 };
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function KineticEnergyGauge() {
   const { momentumScore, getOverallStats, habitLogs, habits, previousWeekMomentum } = useKineticStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [displayScore, setDisplayScore] = useState(50);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const stats = mounted ? getOverallStats() : { totalHabits: 0, totalCompletions: 0, avgStreak: 0, longestStreak: 0 };
 
@@ -38,7 +36,7 @@ export default function KineticEnergyGauge() {
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
+      const dateString = date.toISOString().split('T')[0] || '';
       const dayLogs = habitLogs.filter(l => l.completedAt.startsWith(dateString));
       
       // Simulate momentum calculation
@@ -64,11 +62,14 @@ export default function KineticEnergyGauge() {
     
     // Adjust final score to match current momentum
     if (history.length > 0) {
-      const adjustment = momentumScore - history[history.length - 1].score;
-      history.forEach(h => {
-        h.score = Math.max(0, Math.min(100, h.score + adjustment * 0.5));
-      });
-      history[history.length - 1].score = momentumScore;
+      const lastItem = history[history.length - 1];
+      if (lastItem) {
+        const adjustment = momentumScore - lastItem.score;
+        history.forEach(h => {
+          h.score = Math.max(0, Math.min(100, h.score + adjustment * 0.5));
+        });
+        lastItem.score = momentumScore;
+      }
     }
     
     return history;
