@@ -10,9 +10,15 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { useMounted } from '@/hooks/useMounted';
 
 export default function WeeklyWrapCard() {
-  const { getWeeklySummary, habits, habitLogs, moodLogs } = useKineticStore();
+  const { getWeeklySummary, updateWeeklyMomentum, habits, habitLogs, moodLogs } = useKineticStore();
   const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (mounted) {
+      updateWeeklyMomentum();
+    }
+  }, [mounted, updateWeeklyMomentum]);
 
   const summary = mounted ? getWeeklySummary() : { topHabit: null, totalCompletions: 0, completionRate: 0, momentumChange: 0, avgMood: null };
 

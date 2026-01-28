@@ -1,0 +1,19 @@
+# Kinetic - Habit & Mood Tracker
+
+> A minimalist habit and mood tracker built with Next.js 15 and Tailwind CSS 4.
+
+## Core Structure
+- [src/app/]: Application pages (Dashboard, Trends, Login).
+- [src/store/useKineticStore.ts]: Central Zustand store for state management.
+- [src/lib/]: Core logic for habit calculations, momentum, and sync.
+- [src/components/]: UI components including dashboard cards and charts.
+
+## Key Logic
+- **Momentum Score**: Managed in `useKineticStore.ts`, involves bonuses for completions and daily decay.
+- **Syncing**: Handled via Supabase in `src/lib/sync.ts` and `src/lib/supabase.ts`.
+- **Habit Streaks**: Calculated dynamically based on `HabitLog` entries.
+
+## Technical Details
+- **Stack**: Next.js 15, React 19, Tailwind CSS 4, Framer Motion, Zustand, Supabase.
+- **Persistence**: Zustand `persist` middleware with `localStorage`.
+- **Styling**: Monochrome design system with glassmorphic elements.

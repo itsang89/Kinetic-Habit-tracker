@@ -130,6 +130,7 @@ interface KineticState {
   getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[] };
   clearAllData: () => void;
   getJoinDate: () => string;
+  updateWeeklyMomentum: () => void;
 }
 
 const generateId = () => {
@@ -910,27 +911,8 @@ export const useKineticStore = create<KineticState>()(
 
       getWeeklySummary: () => {
         const state = get();
-        const today = new Date();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        
-        // Update previousWeekMomentum if it's a new week (e.g., Sunday)
-        // Store the last update date in a separate field or check if it's been a week
-        const lastUpdateKey = 'lastWeeklyMomentumUpdate';
-        const lastUpdate = typeof window !== 'undefined' ? localStorage.getItem(lastUpdateKey) : null;
-        const lastUpdateDate = lastUpdate ? new Date(lastUpdate) : null;
-        const daysSinceUpdate = lastUpdateDate 
-          ? Math.floor((today.getTime() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24))
-          : 999;
-        
-        // Update if it's been 7+ days or if it's Sunday and we haven't updated this week
-        const isSunday = today.getDay() === 0;
-        const shouldUpdate = daysSinceUpdate >= 7 || (isSunday && (!lastUpdateDate || lastUpdateDate.getDay() !== 0));
-        
-        if (shouldUpdate && typeof window !== 'undefined') {
-          set({ previousWeekMomentum: state.momentumScore });
-          localStorage.setItem(lastUpdateKey, today.toISOString());
-        }
         
         // Get completions this week
         const weekLogs = state.habitLogs.filter(
@@ -1158,6 +1140,26 @@ export const useKineticStore = create<KineticState>()(
           month: 'long', 
           year: 'numeric' 
         });
+      },
+
+      updateWeeklyMomentum: () => {
+        const state = get();
+        const today = new Date();
+        const lastUpdateKey = 'lastWeeklyMomentumUpdate';
+        const lastUpdate = typeof window !== 'undefined' ? localStorage.getItem(lastUpdateKey) : null;
+        const lastUpdateDate = lastUpdate ? new Date(lastUpdate) : null;
+        const daysSinceUpdate = lastUpdateDate 
+          ? Math.floor((today.getTime() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+        
+        // Update if it's been 7+ days or if it's Sunday and we haven't updated this week
+        const isSunday = today.getDay() === 0;
+        const shouldUpdate = daysSinceUpdate >= 7 || (isSunday && (!lastUpdateDate || lastUpdateDate.getDay() !== 0));
+        
+        if (shouldUpdate && typeof window !== 'undefined') {
+          set({ previousWeekMomentum: state.momentumScore });
+          localStorage.setItem(lastUpdateKey, today.toISOString());
+        }
       },
     }),
     {
