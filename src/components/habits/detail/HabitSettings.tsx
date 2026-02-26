@@ -78,7 +78,7 @@ export default function HabitSettings({
                 </button>
                 <button
                   onClick={onDelete}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--color-error)]/14 text-[var(--color-error)] hover:bg-[var(--color-error)]/24 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span className="text-sm font-medium">Delete Habit</span>

@@ -45,12 +45,32 @@ export interface MoodLog {
   loggedAt: string;
 }
 
+export type MissReason = 'busy' | 'low_energy' | 'forgot';
+
+export interface MissReasonLog {
+  id: string;
+  habitId: string;
+  date: string; // YYYY-MM-DD
+  reason: MissReason;
+  createdAt: string;
+}
+
+export interface WeeklyContractStatus {
+  target: number | null;
+  completed: number;
+  totalScheduled: number;
+  remaining: number;
+  isMet: boolean;
+}
+
 export interface WeeklySummary {
   topHabit: { name: string; completions: number } | null;
   totalCompletions: number;
   completionRate: number;
   momentumChange: number;
   avgMood: number | null;
+  contract: WeeklyContractStatus;
+  missReasons: { reason: MissReason; count: number }[];
 }
 
 export type Theme = 'light' | 'dark';
@@ -62,6 +82,8 @@ interface KineticState {
   habits: Habit[];
   habitLogs: HabitLog[];
   moodLogs: MoodLog[];
+  missReasonLogs: MissReasonLog[];
+  weeklyContractTarget: number | null;
   
   // Computed
   momentumScore: number;
@@ -89,6 +111,9 @@ interface KineticState {
   removeHabitCompletion: (habitId: string, date?: string) => Promise<void>;
   useShield: (habitId: string) => Promise<void>;
   logMood: (score: number, date?: string) => Promise<void>;
+  logMissReason: (habitId: string, reason: MissReason, date?: string) => Promise<void>;
+  clearMissReason: (habitId: string, date?: string) => Promise<void>;
+  setWeeklyContractTarget: (target: number | null) => void;
   
   // Cloud sync actions
   syncToCloud: () => Promise<void>;
@@ -106,6 +131,9 @@ interface KineticState {
   getWeeklyHabitData: (habitId: string) => { date: string; completed: boolean }[];
   getYearlyHabitData: (habitId: string) => { date: string; count: number }[];
   getMoodCorrelationData: () => { date: string; mood: number; completionRate: number }[];
+  getMissReasonForHabitDate: (habitId: string, date: string) => MissReason | null;
+  getWeeklyMissReasonStats: () => { reason: MissReason; count: number }[];
+  getWeeklyContractStatus: () => WeeklyContractStatus;
   
   // New Trends selectors
   getTotalVolume: () => { habitId: string; name: string; total: number; unit: string }[];
@@ -127,7 +155,7 @@ interface KineticState {
   setTheme: (theme: Theme) => void;
 
   // Data export helpers
-  getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[] };
+  getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[]; missReasonLogs: MissReasonLog[]; weeklyContractTarget: number | null };
   clearAllData: () => void;
   getJoinDate: () => string;
   updateWeeklyMomentum: () => void;
@@ -263,6 +291,8 @@ export const useKineticStore = create<KineticState>()(
       habits: [],
       habitLogs: [],
       moodLogs: [],
+      missReasonLogs: [],
+      weeklyContractTarget: null,
       momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
       lastDecayDate: null,
       previousWeekMomentum: MOMENTUM_CONSTANTS.INITIAL_SCORE,
@@ -291,6 +321,7 @@ export const useKineticStore = create<KineticState>()(
         set((state) => ({
           habits: state.habits.filter((h) => h.id !== habitId),
           habitLogs: state.habitLogs.filter((l) => l.habitId !== habitId),
+          missReasonLogs: state.missReasonLogs.filter((l) => l.habitId !== habitId),
         }));
         await get().syncToCloud();
       },
@@ -333,6 +364,7 @@ export const useKineticStore = create<KineticState>()(
             h.id === habitId ? { ...h, streak: 0, bestStreak: 0 } : h
           ),
           habitLogs: state.habitLogs.filter((l) => l.habitId !== habitId),
+          missReasonLogs: state.missReasonLogs.filter((l) => l.habitId !== habitId),
         }));
         await get().syncToCloud();
       },
@@ -359,6 +391,7 @@ export const useKineticStore = create<KineticState>()(
         set((state) => ({
           habits: state.habits.filter((h) => !habitIds.includes(h.id)),
           habitLogs: state.habitLogs.filter((l) => !habitIds.includes(l.habitId)),
+          missReasonLogs: state.missReasonLogs.filter((l) => !habitIds.includes(l.habitId)),
         }));
         await get().syncToCloud();
       },
@@ -416,6 +449,9 @@ export const useKineticStore = create<KineticState>()(
 
         set((state) => ({
             habitLogs: logs,
+            missReasonLogs: state.missReasonLogs.filter(
+              (entry) => !(entry.habitId === habitId && entry.date === targetDate)
+            ),
             habits: state.habits.map((h) =>
               h.id === habitId ? { ...h, streak: newStreak, bestStreak: newBestStreak } : h
             ),
@@ -487,6 +523,51 @@ export const useKineticStore = create<KineticState>()(
           set((state) => ({ moodLogs: [...state.moodLogs, newLog] }));
         }
         await get().syncToCloud();
+      },
+
+      logMissReason: async (habitId, reason, date) => {
+        const targetDate = date || getDateString();
+        const state = get();
+
+        const existing = state.missReasonLogs.find(
+          (entry) => entry.habitId === habitId && entry.date === targetDate
+        );
+
+        if (existing) {
+          set((current) => ({
+            missReasonLogs: current.missReasonLogs.map((entry) =>
+              entry.id === existing.id ? { ...entry, reason } : entry
+            ),
+          }));
+        } else {
+          const newEntry: MissReasonLog = {
+            id: generateId(),
+            habitId,
+            date: targetDate,
+            reason,
+            createdAt: new Date().toISOString(),
+          };
+
+          set((current) => ({
+            missReasonLogs: [...current.missReasonLogs, newEntry],
+          }));
+        }
+
+        await get().syncToCloud();
+      },
+
+      clearMissReason: async (habitId, date) => {
+        const targetDate = date || getDateString();
+        set((state) => ({
+          missReasonLogs: state.missReasonLogs.filter(
+            (entry) => !(entry.habitId === habitId && entry.date === targetDate)
+          ),
+        }));
+        await get().syncToCloud();
+      },
+
+      setWeeklyContractTarget: (target) => {
+        set({ weeklyContractTarget: target });
       },
 
       syncToCloud: async () => {
@@ -784,6 +865,98 @@ export const useKineticStore = create<KineticState>()(
         return data;
       },
 
+      getMissReasonForHabitDate: (habitId, date) => {
+        const state = get();
+        const entry = state.missReasonLogs.find(
+          (item) => item.habitId === habitId && item.date === date
+        );
+        return entry?.reason ?? null;
+      },
+
+      getWeeklyMissReasonStats: () => {
+        const state = get();
+        const today = new Date();
+        const day = today.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() + diff);
+        weekStart.setHours(0, 0, 0, 0);
+
+        const counts: Record<MissReason, number> = {
+          busy: 0,
+          low_energy: 0,
+          forgot: 0,
+        };
+
+        state.missReasonLogs.forEach((entry) => {
+          const entryDate = new Date(`${entry.date}T00:00:00`);
+          if (entryDate >= weekStart && entryDate <= today) {
+            counts[entry.reason] += 1;
+          }
+        });
+
+        return (Object.keys(counts) as MissReason[]).map((reason) => ({
+          reason,
+          count: counts[reason],
+        }));
+      },
+
+      getWeeklyContractStatus: () => {
+        const state = get();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const day = today.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() + diff);
+        weekStart.setHours(0, 0, 0, 0);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        let totalScheduled = 0;
+        let completed = 0;
+
+        const activeHabits = state.habits.filter((habit) => !habit.isArchived);
+
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + i);
+          const dateString = getDateString(date);
+          const dayOfWeek = getDayOfWeek(date);
+
+          activeHabits.forEach((habit) => {
+            const habitCreatedAt = new Date(habit.createdAt);
+            habitCreatedAt.setHours(0, 0, 0, 0);
+            if (habitCreatedAt > date) return;
+            if (!habit.schedule.includes(dayOfWeek)) return;
+
+            totalScheduled += 1;
+
+            const log = state.habitLogs.find(
+              (entry) => entry.habitId === habit.id && entry.completedAt.startsWith(dateString)
+            );
+
+            if (log && log.value / habit.target >= 1) {
+              completed += 1;
+            }
+          });
+        }
+
+        const target = state.weeklyContractTarget;
+        const remaining = target === null ? 0 : Math.max(0, target - completed);
+
+        return {
+          target,
+          completed,
+          totalScheduled,
+          remaining,
+          isMet: target !== null && completed >= target,
+        };
+      },
+
       // New Trends selectors
       getTotalVolume: () => {
         const state = get();
@@ -913,6 +1086,7 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
+        const activeHabits = state.habits.filter((habit) => !habit.isArchived);
         
         // Get completions this week
         const weekLogs = state.habitLogs.filter(
@@ -934,7 +1108,7 @@ export const useKineticStore = create<KineticState>()(
         
         Object.entries(habitCounts).forEach(([habitId, count]) => {
           if (count > maxCompletions) {
-            const habit = state.habits.find((h) => h.id === habitId);
+            const habit = activeHabits.find((h) => h.id === habitId);
             if (habit) {
               topHabit = { name: habit.name, completions: count };
               maxCompletions = count;
@@ -952,7 +1126,7 @@ export const useKineticStore = create<KineticState>()(
           const dateString = getDateString(date);
           const dayOfWeek = getDayOfWeek(date);
           
-          state.habits.forEach((habit) => {
+          activeHabits.forEach((habit) => {
             if (habit.schedule.includes(dayOfWeek)) {
               totalScheduled++;
               const log = state.habitLogs.find(
@@ -979,6 +1153,8 @@ export const useKineticStore = create<KineticState>()(
           completionRate: totalScheduled > 0 ? (totalCompletedValue / totalScheduled) * 100 : 0,
           momentumChange: state.momentumScore - state.previousWeekMomentum,
           avgMood,
+          contract: get().getWeeklyContractStatus(),
+          missReasons: get().getWeeklyMissReasonStats(),
         };
       },
 
@@ -1115,6 +1291,8 @@ export const useKineticStore = create<KineticState>()(
           habits: state.habits,
           habitLogs: state.habitLogs,
           moodLogs: state.moodLogs,
+          missReasonLogs: state.missReasonLogs,
+          weeklyContractTarget: state.weeklyContractTarget,
         };
       },
 
@@ -1123,6 +1301,8 @@ export const useKineticStore = create<KineticState>()(
           habits: [],
           habitLogs: [],
           moodLogs: [],
+          missReasonLogs: [],
+          weeklyContractTarget: null,
           momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
           lastDecayDate: null,
           previousWeekMomentum: MOMENTUM_CONSTANTS.INITIAL_SCORE,
@@ -1173,6 +1353,8 @@ export const useKineticStore = create<KineticState>()(
         if (state) {
           state.userName = state.userName ?? 'Your Name';
           state.userIcon = state.userIcon ?? 'star';
+          state.weeklyContractTarget = state.weeklyContractTarget ?? null;
+          state.missReasonLogs = state.missReasonLogs ?? [];
           state.habits = state.habits.map((habit) => ({
             ...habit,
             bestStreak: habit.bestStreak ?? habit.streak,

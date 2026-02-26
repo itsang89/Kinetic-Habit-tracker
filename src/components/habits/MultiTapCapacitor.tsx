@@ -138,9 +138,9 @@ export default function MultiTapCapacitor({ value, max, onChange, unit = 'cups' 
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isHovered && value < max ? 1 : 0 }}
-                className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full pointer-events-none"
+                className="absolute inset-0 flex items-center justify-center bg-[var(--bg-base)]/20 rounded-full pointer-events-none"
             >
-                <Plus className="w-6 h-6 text-white" />
+                <Plus className="w-6 h-6 text-[var(--theme-text-primary)]" />
             </motion.div>
         )}
       </motion.div>
@@ -157,4 +157,3 @@ export default function MultiTapCapacitor({ value, max, onChange, unit = 'cups' 
     </div>
   );
 }
-

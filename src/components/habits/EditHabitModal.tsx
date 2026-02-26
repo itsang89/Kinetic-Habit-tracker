@@ -2,10 +2,11 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ToggleLeft, Timer, Hash } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Habit, HabitCategory, DayOfWeek, HabitType, useKineticStore } from '@/store/useKineticStore';
 import { HABIT_ICON_OPTIONS } from '@/lib/habitIcons';
 import { useHabitForm } from '@/hooks/useHabitForm';
+import { HABIT_TEMPLATE_PACKS } from '@/lib/habitTemplates';
 
 const categoryOptions: { value: HabitCategory; label: string }[] = [
   { value: 'health', label: 'Health' },
@@ -32,6 +33,7 @@ interface EditHabitModalProps {
 
 export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModalProps) {
   const { updateHabit, addHabit, setGlobalModalOpen } = useKineticStore();
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
   
   const {
     name, setName,
@@ -64,6 +66,20 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
     onClose();
   };
 
+  const handleApplyTemplate = async (packId: 'sleep' | 'fitness' | 'study') => {
+    const pack = HABIT_TEMPLATE_PACKS.find((item) => item.id === packId);
+    if (!pack) return;
+    setIsApplyingTemplate(true);
+    try {
+      for (const templateHabit of pack.habits) {
+        await addHabit(templateHabit);
+      }
+      onClose();
+    } finally {
+      setIsApplyingTemplate(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -71,7 +87,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--bg-base)]/80 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
@@ -95,6 +111,27 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
             </div>
 
             <div className="p-6 space-y-8">
+              {!habit && (
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-widest block">
+                    Quick-Start Packs
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {HABIT_TEMPLATE_PACKS.map((pack) => (
+                      <button
+                        key={pack.id}
+                        onClick={() => handleApplyTemplate(pack.id)}
+                        disabled={isApplyingTemplate}
+                        className="text-left p-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-foreground)]/5 hover:bg-[var(--theme-foreground)]/10 transition-colors disabled:opacity-60"
+                      >
+                        <p className="text-sm font-semibold text-[var(--theme-text-primary)]">{pack.label}</p>
+                        <p className="text-[11px] text-[var(--theme-text-secondary)] mt-1">{pack.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Habit Name & Type */}
               <div className="space-y-4">
                 <div>
@@ -182,7 +219,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
                           className={`
                             aspect-square rounded-xl flex items-center justify-center transition-all
                             ${icon === option.icon 
-                              ? 'bg-[var(--theme-foreground)] text-[var(--theme-background)] scale-110 shadow-lg shadow-[var(--theme-glow)]' 
+                              ? 'bg-[var(--brand-main)] text-[var(--bg-base)] scale-110 shadow-[var(--shadow-sm)]' 
                               : 'bg-[var(--theme-foreground)]/5 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
                             }
                           `}
@@ -206,7 +243,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
                         className={`
                           px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border
                           ${category === option.value 
-                            ? 'bg-[var(--theme-foreground)]/10 border-[var(--theme-foreground)] text-[var(--theme-text-primary)]' 
+                            ? 'bg-[var(--brand-main)]/12 border-[var(--brand-main)] text-[var(--theme-text-primary)]' 
                             : 'bg-[var(--theme-foreground)]/5 border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
                           }
                         `}
@@ -231,7 +268,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
                       className={`
                         flex-1 aspect-square rounded-xl flex items-center justify-center text-xs font-bold transition-all border
                         ${schedule.includes(day) 
-                          ? 'bg-[var(--theme-foreground)] text-[var(--theme-background)] border-[var(--theme-foreground)]' 
+                          ? 'bg-[var(--brand-main)] text-[var(--bg-base)] border-[var(--brand-main)]' 
                           : 'bg-[var(--theme-foreground)]/5 text-[var(--theme-text-secondary)] border-[var(--theme-border)] hover:bg-[var(--theme-foreground)]/10'
                         }
                       `}
@@ -243,7 +280,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
               </div>
 
               {validationError && (
-                <p className="text-red-400 text-sm font-medium text-center">{validationError}</p>
+                <p className="text-[var(--color-error)] text-sm font-medium text-center">{validationError}</p>
               )}
 
               {/* Action Buttons */}
@@ -256,7 +293,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-[2] py-4 rounded-2xl bg-[var(--theme-foreground)] text-[var(--theme-background)] font-bold uppercase tracking-wider text-sm hover:opacity-90 transition-all shadow-lg shadow-[var(--theme-glow)]"
+                  className="flex-[2] py-4 rounded-2xl bg-[var(--brand-main)] text-[var(--bg-base)] font-bold uppercase tracking-wider text-sm hover:bg-[var(--brand-hover)] transition-all shadow-[var(--shadow-sm)]"
                 >
                   {habit ? 'Save Changes' : 'Create Habit'}
                 </button>

@@ -20,6 +20,7 @@ export default function HabitList({ date }: HabitListProps) {
   const mounted = useMounted();
   const [todayDay, setTodayDay] = useState<DayOfWeek>('Mon');
   const [initialCompletionMap, setInitialCompletionMap] = useState<Record<string, boolean>>({});
+  const activeHabits = useMemo(() => habits.filter((h) => !h.isArchived), [habits]);
 
   useEffect(() => {
     const targetDate = date ? new Date(date) : new Date();
@@ -33,18 +34,18 @@ export default function HabitList({ date }: HabitListProps) {
     if (mounted) {
       const targetDate = date || new Date().toISOString().split('T')[0] || '';
       const map: Record<string, boolean> = {};
-      habits.forEach(h => {
+      activeHabits.forEach(h => {
         map[h.id] = isHabitCompletedOnDate(h.id, targetDate);
       });
       setInitialCompletionMap(map);
     }
-  }, [date, mounted, habits, isHabitCompletedOnDate]);
+  }, [date, mounted, activeHabits, isHabitCompletedOnDate]);
 
   // Filter habits scheduled for today AND existed on this day
   const todaysHabits = useMemo(() => {
     if (!mounted) return [];
     
-    return habits
+    return activeHabits
       .filter((h) => {
         const habitCreatedDate = new Date(h.createdAt);
         habitCreatedDate.setHours(0, 0, 0, 0);
@@ -63,12 +64,12 @@ export default function HabitList({ date }: HabitListProps) {
           if (aCompleted === bCompleted) return 0;
           return aCompleted ? 1 : -1; 
       });
-  }, [mounted, habits, date, todayDay, initialCompletionMap, isHabitCompletedOnDate]);
+  }, [mounted, activeHabits, date, todayDay, initialCompletionMap, isHabitCompletedOnDate]);
 
   const otherHabits = useMemo(() => {
     if (!mounted) return [];
-    return habits.filter((h) => !h.schedule.includes(todayDay));
-  }, [mounted, habits, todayDay]);
+    return activeHabits.filter((h) => !h.schedule.includes(todayDay));
+  }, [mounted, activeHabits, todayDay]);
 
   const todayStr = new Date().toISOString().split('T')[0] || '';
   const isToday = !date || date === todayStr;
@@ -111,7 +112,7 @@ export default function HabitList({ date }: HabitListProps) {
           </Link>
         </div>
 
-        {!mounted || habits.length === 0 ? (
+        {!mounted || activeHabits.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

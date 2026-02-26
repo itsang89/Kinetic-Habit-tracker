@@ -36,7 +36,7 @@ export default function TrendDetailModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/90 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-[var(--bg-base)]/90 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
@@ -45,7 +45,7 @@ export default function TrendDetailModal({
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             onClick={(e) => e.stopPropagation()}
-            className="glass w-full md:max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] overflow-hidden rounded-t-[2.5rem] md:rounded-2xl flex flex-col"
+            className="glass depth-hover w-full md:max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] overflow-hidden rounded-t-[2.5rem] md:rounded-2xl flex flex-col"
           >
             {/* Handle for mobile */}
             <div className="w-full flex justify-center pt-3 pb-1 md:hidden">
@@ -62,7 +62,7 @@ export default function TrendDetailModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-3 rounded-xl bg-[var(--theme-foreground)]/5 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors"
+                className="p-3 rounded-xl bg-[var(--brand-main)]/12 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--brand-main)]/20 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

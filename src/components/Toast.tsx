@@ -36,10 +36,10 @@ function ToastItem({ toast, onRemove }: ToastProps) {
   };
 
   const colors = {
-    success: 'text-green-400 bg-green-400/10 border-green-400/20',
-    error: 'text-red-400 bg-red-400/10 border-red-400/20',
-    info: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-    warning: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
+    success: 'text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20',
+    error: 'text-[var(--color-error)] bg-[var(--color-error)]/10 border-[var(--color-error)]/20',
+    info: 'text-[var(--color-info)] bg-[var(--color-info)]/10 border-[var(--color-info)]/20',
+    warning: 'text-[var(--color-warning)] bg-[var(--color-warning)]/10 border-[var(--color-warning)]/20',
   };
 
   const Icon = icons[toast.type];
@@ -81,5 +81,4 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
     </div>
   );
 }
-
 

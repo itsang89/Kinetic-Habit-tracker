@@ -59,7 +59,7 @@ export default function AuthCallbackPage() {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="glass p-8 rounded-2xl max-w-md w-full text-center"
+        className="glass depth-hover p-8 rounded-2xl max-w-md w-full text-center"
       >
         {status === 'loading' && (
           <>
@@ -73,7 +73,7 @@ export default function AuthCallbackPage() {
 
         {status === 'success' && (
           <>
-            <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+            <CheckCircle className="w-12 h-12 text-[var(--color-success)] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-[var(--theme-text-primary)] mb-2">
               Email Confirmed!
             </h1>
@@ -83,14 +83,14 @@ export default function AuthCallbackPage() {
 
         {status === 'error' && (
           <>
-            <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <XCircle className="w-12 h-12 text-[var(--color-error)] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-[var(--theme-text-primary)] mb-2">
               Verification Failed
             </h1>
             <p className="text-[var(--theme-text-secondary)] mb-4">{message}</p>
             <button
               onClick={() => router.push('/login')}
-              className="px-6 py-3 rounded-xl bg-[var(--theme-foreground)] text-[var(--theme-background)] font-semibold hover:opacity-90 transition-opacity"
+              className="px-6 py-3 rounded-xl bg-[var(--brand-main)] text-[var(--bg-base)] font-semibold hover:bg-[var(--brand-hover)] transition-colors"
             >
               Go to Login
             </button>
@@ -100,5 +100,4 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
-
 

@@ -117,10 +117,10 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
           {weekDates[0]?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
         <div className="flex items-center gap-4">
-          <button onClick={goToPreviousWeek} className="p-1 hover:bg-[var(--theme-foreground)]/10 rounded-full transition-colors">
+          <button onClick={goToPreviousWeek} className="p-1 hover:bg-[var(--brand-main)]/15 rounded-full transition-colors">
             <ChevronLeft className="w-4 h-4 text-[var(--theme-text-secondary)]" />
           </button>
-          <button onClick={goToNextWeek} className="p-1 hover:bg-[var(--theme-foreground)]/10 rounded-full transition-colors">
+          <button onClick={goToNextWeek} className="p-1 hover:bg-[var(--brand-main)]/15 rounded-full transition-colors">
             <ChevronRight className="w-4 h-4 text-[var(--theme-text-secondary)]" />
           </button>
         </div>
@@ -131,7 +131,7 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.2}
         onDragEnd={handleDragEnd}
-        className="flex justify-between items-center bg-[var(--theme-foreground)]/[0.03] rounded-2xl p-4 border border-[var(--theme-border)] touch-none cursor-grab active:cursor-grabbing"
+        className="surface-card flex justify-between items-center rounded-2xl p-4 touch-none cursor-grab active:cursor-grabbing"
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {weekDates.map((date, i) => {
@@ -161,9 +161,9 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
                   onClick={() => onDateSelect(date)}
                   className={`
                     w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all relative
-                    ${isDateSelected ? 'ring-1 ring-[var(--theme-foreground)] ring-offset-2 ring-offset-[var(--theme-background)]' : ''}
-                    ${status === 'complete' ? 'bg-[var(--theme-foreground)] text-[var(--theme-background)]' : ''}
-                    ${status === 'partial' ? 'bg-[var(--theme-foreground)]/30 text-[var(--theme-text-primary)]' : ''}
+                    ${isDateSelected ? 'ring-1 ring-[var(--brand-main)] ring-offset-2 ring-offset-[var(--bg-base)]' : ''}
+                    ${status === 'complete' ? 'bg-[var(--brand-main)] text-[var(--bg-base)]' : ''}
+                    ${status === 'partial' ? 'bg-[var(--brand-main)]/30 text-[var(--theme-text-primary)]' : ''}
                     ${status === 'missed' && !isFuture ? 'bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] text-[var(--theme-text-secondary)]' : ''}
                     ${status === 'none' || isFuture ? 'bg-transparent text-[var(--theme-text-muted)]' : ''}
                   `}

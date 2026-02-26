@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Check, Shield, Flame, Trash2 } from 'lucide-react';
-import { Habit, useKineticStore } from '@/store/useKineticStore';
+import { Habit, MissReason, useKineticStore } from '@/store/useKineticStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import React, { useState, useEffect } from 'react';
 import KineticSlider from './habits/KineticSlider';
@@ -15,11 +15,23 @@ interface HabitCardProps {
 }
 
 function HabitCardComponent({ habit, index, date }: HabitCardProps) {
-  const { logHabitCompletion, removeHabitCompletion, getHabitProgress, useShield, deleteHabit, setGlobalModalOpen } = useKineticStore();
+  const {
+    logHabitCompletion,
+    removeHabitCompletion,
+    getHabitProgress,
+    useShield,
+    deleteHabit,
+    setGlobalModalOpen,
+    logMissReason,
+    getMissReasonForHabitDate,
+  } = useKineticStore();
   const targetDate = date || new Date().toISOString().split('T')[0] || '';
+  const todayString = new Date().toISOString().split('T')[0] || '';
+  const isToday = targetDate === todayString;
   
   const { current, percent } = getHabitProgress(habit.id, targetDate);
   const isCompleted = percent >= 100;
+  const missReason = getMissReasonForHabitDate(habit.id, targetDate);
   
   const [showDelete, setShowDelete] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -62,6 +74,11 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
       }
   };
 
+  const handleMissReason = async (reason: MissReason, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await logMissReason(habit.id, reason, targetDate);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -72,11 +89,11 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
       onMouseEnter={() => setShowDelete(true)}
       onMouseLeave={() => setShowDelete(false)}
       className={`
-        glass group p-5 relative overflow-hidden border transition-all duration-300
+        glass depth-hover group p-5 relative overflow-hidden border transition-all duration-300
         ${(habit.type === 'simple' || habit.type === 'duration' || habit.type === 'count') ? 'cursor-pointer' : ''}
         ${isCompleted 
-            ? 'border-[var(--theme-foreground)] bg-[var(--theme-foreground)]/[0.08]' 
-            : 'border-[var(--theme-border)] hover:border-[var(--theme-foreground)]/30'
+            ? 'border-[var(--brand-main)] bg-[var(--brand-main)]/[0.12]' 
+            : 'border-[var(--theme-border)] hover:border-[var(--brand-main)]/50'
         }
       `}
     >
@@ -88,8 +105,8 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
                 className={`
                 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors duration-300
                 ${isCompleted 
-                    ? 'bg-[var(--theme-foreground)] border-[var(--theme-foreground)] text-[var(--theme-background)]' 
-                    : 'border-[var(--theme-foreground)]/30 group-hover:border-[var(--theme-foreground)]'
+                    ? 'bg-[var(--brand-main)] border-[var(--brand-main)] text-[var(--bg-base)]' 
+                    : 'border-[var(--brand-main)]/30 group-hover:border-[var(--brand-main)]'
                 }
                 `}
             >
@@ -116,7 +133,7 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
                       w-1 h-1 rounded-full
                       ${habit.schedule.includes(day) 
                         ? 'bg-[var(--theme-text-secondary)]' 
-                        : 'bg-[var(--theme-foreground)]/10'
+                        : 'bg-[var(--brand-main)]/15'
                       }
                     `}
                   />
@@ -129,9 +146,9 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
         <div className="flex items-center gap-2 pl-4">
           {/* Streak */}
           {habit.streak > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-foreground)]/5 rounded-full border border-[var(--theme-border)]">
-              <Flame className="w-3.5 h-3.5 text-[var(--theme-text-primary)]" fill="currentColor" />
-              <span className="text-[var(--theme-text-primary)] text-xs font-bold">{habit.streak}</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--brand-main)]/12 rounded-full border border-[var(--border-subtle)]">
+              <Flame className="w-3.5 h-3.5 text-[var(--brand-main)]" fill="currentColor" />
+              <span className="text-[var(--brand-main)] text-xs font-bold">{habit.streak}</span>
             </div>
           )}
 
@@ -144,7 +161,7 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
             className={`
               w-8 h-8 rounded-full flex items-center justify-center transition-all
               ${habit.shieldAvailable 
-                ? 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/10' 
+                ? 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--brand-main)]/15' 
                 : 'text-[var(--theme-text-muted)] cursor-not-allowed'
               }
             `}
@@ -158,7 +175,7 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
             animate={{ opacity: showDelete ? 1 : 0, scale: showDelete ? 1 : 0.8 }}
             whileHover={{ scale: 1.1 }}
             onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/10 transition-all"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--color-error)]/15 transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </motion.button>
@@ -191,12 +208,40 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
               )}
           </div>
       )}
+
+      {!isCompleted && isToday && (
+        <div
+          className="mt-4 pt-4 border-t border-[var(--theme-border)] flex items-center gap-2 flex-wrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-[10px] uppercase tracking-wider text-[var(--theme-text-secondary)]">Miss reason</span>
+          {([
+            { key: 'busy', label: 'Busy' },
+            { key: 'low_energy', label: 'Low energy' },
+            { key: 'forgot', label: 'Forgot' },
+          ] as const).map((option) => (
+            <button
+              key={option.key}
+              onClick={(e) => handleMissReason(option.key, e)}
+              className={`
+                px-2.5 py-1 rounded-full border text-[10px] font-medium transition-colors
+                ${missReason === option.key
+                  ? 'bg-[var(--theme-foreground)]/15 border-[var(--theme-foreground)]/30 text-[var(--theme-text-primary)]'
+                  : 'bg-[var(--theme-foreground)]/5 border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
+                }
+              `}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
       
       {/* Background fill animation (Only for 100% complete) */}
       {isCompleted && (
          <motion.div 
             layoutId={`bg-${habit.id}`}
-            className="absolute inset-0 bg-gradient-to-r from-[var(--theme-foreground)]/[0.05] to-transparent pointer-events-none"
+            className="absolute inset-0 bg-gradient-to-r from-[var(--brand-main)]/[0.12] to-transparent pointer-events-none"
          />
       )}
 

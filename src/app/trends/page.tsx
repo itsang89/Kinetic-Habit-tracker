@@ -17,10 +17,10 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 export default function TrendsPage() {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen pb-28 selection:bg-[var(--theme-foreground)] selection:text-[var(--theme-background)]">
+      <div className="min-h-screen pb-28 selection:bg-[var(--brand-main)] selection:text-[var(--bg-base)]">
         {/* Background decoration */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-[var(--theme-foreground)]/[0.02] rounded-full blur-3xl -translate-y-1/2" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-[var(--brand-main)]/[0.08] rounded-full blur-3xl -translate-y-1/2" />
         </div>
 
         <div className="relative z-10 max-w-6xl mx-auto px-4 pb-12 pt-4">
@@ -34,15 +34,15 @@ export default function TrendsPage() {
           >
             {/* Section Title */}
             <div className="flex items-center gap-4 mb-8">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--theme-foreground)]/20 to-transparent" />
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--brand-main)]/35 to-transparent" />
               <h2 className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-[0.3em]">Stats & Trends</h2>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--theme-foreground)]/20 to-transparent" />
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--brand-main)]/35 to-transparent" />
             </div>
 
             {/* Bento Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
               {/* Row 1: Energy Gauge, Volume, Streak */}
-              <div className="glass p-5 rounded-2xl md:col-span-2 lg:col-span-2">
+              <div className="glass depth-hover p-5 rounded-2xl md:col-span-2 lg:col-span-2">
                 <KineticEnergyGauge />
               </div>
               <div className="lg:col-span-1">

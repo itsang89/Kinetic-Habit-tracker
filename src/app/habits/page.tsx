@@ -215,10 +215,10 @@ function HabitsContent() {
   }
 
   return (
-    <div className="min-h-screen pb-28 selection:bg-[var(--theme-foreground)] selection:text-[var(--theme-background)]">
+    <div className="min-h-screen pb-28 selection:bg-[var(--brand-main)] selection:text-[var(--bg-base)]">
       {/* Background decoration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-[var(--theme-foreground)]/[0.02] rounded-full blur-3xl -translate-y-1/2" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-[var(--brand-main)]/[0.08] rounded-full blur-3xl -translate-y-1/2" />
       </div>
 
       <div className="relative z-10 max-w-2xl mx-auto px-4 pb-12 pt-4">
@@ -420,7 +420,7 @@ function HabitsContent() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="p-2 rounded-full bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 transition-colors"
+                        className="p-2 rounded-full bg-[var(--color-error)]/18 text-[var(--color-error)] hover:bg-[var(--color-error)]/28 transition-colors"
                         title="Delete selected"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -450,7 +450,7 @@ function HabitsContent() {
               <p className="text-[var(--theme-text-secondary)] mb-6">Create your first habit to start tracking</p>
               <button
                 onClick={() => openEditModal(null)}
-                className="px-6 py-3 rounded-full bg-[var(--theme-foreground)] text-[var(--theme-background)] font-semibold text-sm hover:opacity-90 transition-opacity"
+                className="px-6 py-3 rounded-full bg-[var(--brand-main)] text-[var(--bg-base)] font-semibold text-sm hover:bg-[var(--brand-hover)] transition-colors"
               >
                 Create Habit
               </button>

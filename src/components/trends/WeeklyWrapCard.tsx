@@ -10,7 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { useMounted } from '@/hooks/useMounted';
 
 export default function WeeklyWrapCard() {
-  const { getWeeklySummary, updateWeeklyMomentum, habits, habitLogs, moodLogs } = useKineticStore();
+  const { getWeeklySummary, updateWeeklyMomentum, habits, habitLogs, moodLogs, setWeeklyContractTarget } = useKineticStore();
   const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -20,7 +20,15 @@ export default function WeeklyWrapCard() {
     }
   }, [mounted, updateWeeklyMomentum]);
 
-  const summary = mounted ? getWeeklySummary() : { topHabit: null, totalCompletions: 0, completionRate: 0, momentumChange: 0, avgMood: null };
+  const summary = mounted ? getWeeklySummary() : {
+    topHabit: null,
+    totalCompletions: 0,
+    completionRate: 0,
+    momentumChange: 0,
+    avgMood: null,
+    contract: { target: null, completed: 0, totalScheduled: 0, remaining: 0, isMet: false },
+    missReasons: [],
+  };
 
   // Get weekly data for detailed view
   const weeklyData = useMemo(() => {
@@ -70,8 +78,17 @@ export default function WeeklyWrapCard() {
   };
 
   const MomentumIcon = getMomentumIcon();
+  const activeHabits = habits.filter((habit) => !habit.isArchived);
+  const contractPresets = summary.contract.totalScheduled > 0
+    ? [0.5, 0.7, 0.9].map((ratio) => Math.max(1, Math.round(summary.contract.totalScheduled * ratio)))
+    : [];
+  const missReasonLabels: Record<string, string> = {
+    busy: 'Busy',
+    low_energy: 'Low Energy',
+    forgot: 'Forgot',
+  };
 
-  if (!mounted || habits.length === 0) {
+  if (!mounted || activeHabits.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -164,6 +181,46 @@ export default function WeeklyWrapCard() {
             </div>
           </div>
         )}
+
+        {/* Weekly Contract */}
+        <div className="p-3 bg-[var(--theme-foreground)]/5 rounded-xl border border-[var(--theme-border)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider">Weekly Contract</span>
+            <span className="text-xs font-semibold text-[var(--theme-text-primary)]">
+              {summary.contract.completed}/{summary.contract.totalScheduled}
+            </span>
+          </div>
+          {summary.contract.target === null ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {contractPresets.map((value) => (
+                <button
+                  key={value}
+                  onClick={() => setWeeklyContractTarget(value)}
+                  className="px-2 py-1 rounded-full text-[10px] font-semibold border border-[var(--theme-border)] hover:bg-[var(--theme-foreground)]/10 transition-colors"
+                >
+                  Set {value}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--theme-text-secondary)]">
+                Target: {summary.contract.target} of {summary.contract.totalScheduled}
+              </span>
+              <button
+                onClick={() => setWeeklyContractTarget(null)}
+                className="text-[10px] text-[var(--theme-text-secondary)] underline underline-offset-2 hover:text-[var(--theme-text-primary)]"
+              >
+                Reset
+              </button>
+            </div>
+          )}
+          {summary.contract.target !== null && (
+            <p className="text-[11px] text-[var(--theme-text-secondary)]">
+              {summary.contract.isMet ? 'Contract met.' : `${summary.contract.remaining} more completions needed this week.`}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
@@ -314,6 +371,43 @@ export default function WeeklyWrapCard() {
             <div className="text-center">
               <p className="text-3xl font-bold text-[var(--theme-text-primary)]">{summary.avgMood?.toFixed(1) || '-'}</p>
               <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider">Avg Mood</p>
+            </div>
+          </div>
+
+          {/* Contract + Miss Reasons Recap */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="p-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-foreground)]/5">
+              <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider mb-2">Contract Recap</p>
+              {summary.contract.target === null ? (
+                <p className="text-sm text-[var(--theme-text-secondary)]">No weekly target set yet.</p>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold text-[var(--theme-text-primary)]">
+                    {summary.contract.completed} / {summary.contract.target}
+                  </p>
+                  <p className="text-sm text-[var(--theme-text-secondary)]">
+                    {summary.contract.isMet ? 'You met your contract this week.' : `${summary.contract.remaining} completions still needed.`}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="p-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-foreground)]/5">
+              <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider mb-2">Miss Reasons</p>
+              {summary.missReasons.every((item) => item.count === 0) ? (
+                <p className="text-sm text-[var(--theme-text-secondary)]">No miss reasons logged this week.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {summary.missReasons
+                    .filter((item) => item.count > 0)
+                    .sort((a, b) => b.count - a.count)
+                    .map((item) => (
+                      <div key={item.reason} className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--theme-text-secondary)]">{missReasonLabels[item.reason]}</span>
+                        <span className="font-semibold text-[var(--theme-text-primary)]">{item.count}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

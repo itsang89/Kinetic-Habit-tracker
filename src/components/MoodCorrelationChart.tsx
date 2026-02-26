@@ -35,12 +35,12 @@ export default function MoodCorrelationChart() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-black border border-white/20 p-3 rounded-xl shadow-xl backdrop-blur-md">
+        <div className="surface-raised p-3 rounded-xl shadow-[var(--shadow-md)] backdrop-blur-md">
           <p className="text-neutral-400 text-xs mb-2 font-medium uppercase tracking-wider">{formatDate(String(label || ''))}</p>
           {payload.map((item: any, index: number) => (
             <div key={index} className="flex items-center gap-2 mb-1">
                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-               <p className="text-sm font-medium text-white">
+               <p className="text-sm font-medium text-[var(--theme-text-primary)]">
                   {item.name}: {Math.round(Number(item.value))}%
                </p>
             </div>
@@ -56,31 +56,31 @@ export default function MoodCorrelationChart() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
-      className="glass p-8"
+      className="glass depth-hover p-8"
     >
       <div className="flex items-center gap-3 mb-8">
-        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-           <TrendingUp className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 flex items-center justify-center">
+           <TrendingUp className="w-4 h-4 text-[var(--brand-main)]" />
         </div>
-        <h2 className="text-sm font-semibold text-white uppercase tracking-widest">Correlation Analysis</h2>
+        <h2 className="text-sm font-semibold text-[var(--theme-text-primary)] uppercase tracking-widest">Correlation Analysis</h2>
       </div>
 
       <div className="h-[300px] min-h-[300px]">
         <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
           <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={formatDate}
-              stroke="rgba(255,255,255,0.2)"
-              tick={{ fontSize: 10, fill: '#737373', fontWeight: 500 }}
+              stroke="var(--theme-border)"
+              tick={{ fontSize: 10, fill: 'var(--theme-text-tertiary)', fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
               dy={10}
             />
             <YAxis
-              stroke="rgba(255,255,255,0.2)"
-              tick={{ fontSize: 10, fill: '#737373', fontWeight: 500 }}
+              stroke="var(--theme-border)"
+              tick={{ fontSize: 10, fill: 'var(--theme-text-tertiary)', fontWeight: 500 }}
               domain={[0, 100]}
               tickFormatter={(value) => `${value}%`}
               axisLine={false}
@@ -95,21 +95,21 @@ export default function MoodCorrelationChart() {
               type="basis"
               dataKey="mood"
               name="Mood Level"
-              stroke="#ffffff"
+              stroke="var(--chart-6)"
               strokeWidth={2}
-              dot={{ fill: '#000000', stroke: '#ffffff', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, fill: '#ffffff', stroke: 'none' }}
+              dot={{ fill: 'var(--bg-base)', stroke: 'var(--chart-6)', strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, fill: 'var(--chart-6)', stroke: 'none' }}
               animationDuration={1500}
             />
             <Line
               type="basis"
               dataKey="completionRate"
               name="Habit Completion"
-              stroke="#525252"
+              stroke="var(--chart-2)"
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}
-              activeDot={{ r: 6, fill: '#525252', stroke: 'none' }}
+              activeDot={{ r: 6, fill: 'var(--chart-2)', stroke: 'none' }}
               animationDuration={1500}
             />
           </LineChart>

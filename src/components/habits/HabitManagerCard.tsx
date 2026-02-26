@@ -48,7 +48,7 @@ function HabitManagerCardComponent({
   const background = useTransform(
     x,
     [-100, 0, 100],
-    ['rgba(239, 68, 68, 0.2)', 'rgba(0, 0, 0, 0)', 'rgba(34, 197, 94, 0.2)']
+    ['color-mix(in oklab, var(--color-error) 20%, transparent)', 'transparent', 'color-mix(in oklab, var(--color-success) 20%, transparent)']
   );
 
   const handleDragStart = () => {
@@ -112,15 +112,15 @@ function HabitManagerCardComponent({
       {/* Left action (archive) */}
       <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 ${showActions === 'left' ? 'opacity-100' : 'opacity-0'}`}>
         {habit.isArchived ? (
-          <ArchiveRestore className="w-6 h-6 text-green-400" />
+          <ArchiveRestore className="w-6 h-6 text-[var(--color-success)]" />
         ) : (
-          <Archive className="w-6 h-6 text-red-400" />
+          <Archive className="w-6 h-6 text-[var(--color-error)]" />
         )}
       </div>
       
       {/* Right action (edit) */}
       <div className={`absolute right-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 ${showActions === 'right' ? 'opacity-100' : 'opacity-0'}`}>
-        <Edit3 className="w-6 h-6 text-green-400" />
+        <Edit3 className="w-6 h-6 text-[var(--color-success)]" />
       </div>
 
       {/* Card content */}
@@ -135,7 +135,7 @@ function HabitManagerCardComponent({
         onClick={handleClick}
         className={`
           relative glass p-4 rounded-xl cursor-pointer transition-all duration-200
-          ${isSelected ? 'ring-2 ring-[var(--theme-foreground)]' : ''}
+          ${isSelected ? 'ring-2 ring-[var(--brand-main)]' : ''}
           ${habit.isArchived ? 'opacity-60' : ''}
           hover:bg-[var(--theme-foreground)]/[0.03]
         `}

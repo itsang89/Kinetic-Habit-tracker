@@ -18,7 +18,7 @@ export default function CompactStats() {
     // Calculate today's completion
     const today = new Date();
     const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][today.getDay()] as DayOfWeek;
-    const todaysHabits = habits.filter(h => h.schedule.includes(dayOfWeek));
+    const todaysHabits = habits.filter(h => !h.isArchived && h.schedule.includes(dayOfWeek));
     const todayString = today.toISOString().split('T')[0] || '';
     
     if (todaysHabits.length > 0) {
@@ -41,14 +41,14 @@ export default function CompactStats() {
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass p-4 rounded-xl flex items-center justify-between"
+        className="glass depth-hover p-4 rounded-xl flex items-center justify-between"
       >
         <div>
            <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold mb-1">Today's Focus</p>
            <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{completionRate}%</p>
         </div>
-        <div className="w-10 h-10 rounded-full bg-[var(--theme-foreground)]/5 flex items-center justify-center">
-          <CheckCircle2 className="w-5 h-5 text-[var(--theme-text-primary)]" />
+        <div className="w-10 h-10 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5 text-[var(--brand-main)]" />
         </div>
       </motion.div>
 
@@ -56,14 +56,14 @@ export default function CompactStats() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass p-4 rounded-xl flex items-center justify-between"
+        className="glass depth-hover p-4 rounded-xl flex items-center justify-between"
       >
         <div>
            <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold mb-1">Momentum</p>
            <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{Math.round(momentumScore)}</p>
         </div>
-        <div className="w-10 h-10 rounded-full bg-[var(--theme-foreground)]/5 flex items-center justify-center">
-          <Flame className="w-5 h-5 text-[var(--theme-text-primary)]" />
+        <div className="w-10 h-10 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center">
+          <Flame className="w-5 h-5 text-[var(--brand-main)]" />
         </div>
       </motion.div>
     </div>

@@ -7,14 +7,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, isGuest, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !isGuest) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, isGuest, loading, router]);
 
   if (loading) {
     return (
@@ -24,6 +24,5 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
-  return user ? <>{children}</> : null;
+  return user || isGuest ? <>{children}</> : null;
 }
-

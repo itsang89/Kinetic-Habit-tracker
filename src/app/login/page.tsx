@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
-import Link from 'next/link';
+import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const { continueAsGuest } = useAuth();
   const router = useRouter();
 
   const validateForm = (): string | null => {
@@ -104,21 +105,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--theme-background)] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)] p-4 selection:bg-[var(--brand-main)] selection:text-[var(--bg-base)]">
       {/* Background decoration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-[var(--theme-foreground)]/[0.03] rounded-full blur-3xl -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[var(--theme-foreground)]/[0.02] rounded-full blur-3xl translate-y-1/3 translate-x-1/3" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[400px] bg-[var(--brand-main)]/[0.10] rounded-full blur-3xl -translate-y-1/2" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[var(--brand-300)]/[0.08] rounded-full blur-3xl translate-y-1/3 translate-x-1/3" />
       </div>
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass p-8 rounded-[2.5rem] w-full max-w-md relative z-10"
+        className="glass depth-hover p-8 rounded-[2.5rem] w-full max-w-md relative z-10"
       >
         <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-[var(--theme-foreground)] flex items-center justify-center mb-6 shadow-lg shadow-[var(--theme-glow)]">
-            <Sparkles className="w-8 h-8 text-[var(--theme-background)]" />
+          <div className="w-16 h-16 rounded-3xl bg-[var(--brand-main)] flex items-center justify-center mb-6 shadow-[var(--shadow-md)]">
+            <Sparkles className="w-8 h-8 text-[var(--bg-base)]" />
           </div>
           <h1 className="text-3xl font-bold text-[var(--theme-text-primary)] mb-2">
             {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
@@ -136,7 +137,7 @@ export default function LoginPage() {
               placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 rounded-2xl bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] text-[var(--theme-text-primary)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-foreground)]/30 transition-all"
+              className="surface-sunken w-full pl-12 pr-4 py-4 rounded-2xl text-[var(--theme-text-primary)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--brand-main)] transition-all"
               required
             />
           </div>
@@ -149,7 +150,7 @@ export default function LoginPage() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] text-[var(--theme-text-primary)] placeholder:text-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-foreground)]/30 transition-all"
+                className="surface-sunken w-full pl-12 pr-4 py-4 rounded-2xl text-[var(--theme-text-primary)] placeholder:text-[var(--theme-text-muted)] focus:border-[var(--brand-main)] transition-all"
                 required
               />
             </div>
@@ -175,7 +176,7 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="text-green-400 text-sm font-medium px-1 bg-green-400/10 p-3 rounded-xl"
+              className="text-[var(--color-success)] text-sm font-medium px-1 bg-[var(--color-success)]/12 p-3 rounded-xl"
             >
               Password reset email sent! Check your inbox.
             </motion.div>
@@ -185,7 +186,7 @@ export default function LoginPage() {
             <motion.p 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="text-red-400 text-xs font-medium px-1"
+              className="text-[var(--color-error)] text-xs font-medium px-1"
             >
               {validationError}
             </motion.p>
@@ -194,7 +195,7 @@ export default function LoginPage() {
             <motion.p 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="text-red-400 text-xs font-medium px-1"
+              className="text-[var(--color-error)] text-xs font-medium px-1"
             >
               {error}
             </motion.p>
@@ -205,7 +206,7 @@ export default function LoginPage() {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading || resetEmailSent}
-            className="w-full py-4 rounded-2xl bg-[var(--theme-foreground)] text-[var(--theme-background)] font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 mt-6"
+            className="w-full py-4 rounded-2xl bg-[var(--brand-main)] text-[var(--bg-base)] font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-2 hover:bg-[var(--brand-hover)] transition-all disabled:opacity-50 mt-6"
           >
             {loading ? (
               <LoadingSpinner size="sm" />
@@ -217,6 +218,20 @@ export default function LoginPage() {
             )}
           </motion.button>
         </form>
+
+        {mode === 'login' && (
+          <button
+            type="button"
+            onClick={() => {
+              continueAsGuest();
+              router.push('/');
+            }}
+            className="w-full py-3 mt-4 rounded-2xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[var(--theme-foreground)]/5 transition-colors"
+          >
+            <User className="w-4 h-4" />
+            Continue as Guest
+          </button>
+        )}
 
         <div className="mt-8 pt-6 border-t border-[var(--theme-border)] text-center">
           {mode === 'reset' ? (
@@ -251,4 +266,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

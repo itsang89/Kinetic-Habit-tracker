@@ -47,11 +47,11 @@ export default function PaperChain() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass p-6"
+        className="glass depth-hover p-6"
       >
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-            <Link2 className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 flex items-center justify-center">
+            <Link2 className="w-4 h-4 text-[var(--brand-main)]" />
           </div>
           <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Consistency Chain</h3>
         </div>
@@ -71,17 +71,17 @@ export default function PaperChain() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass p-6 overflow-hidden"
+      className="glass depth-hover p-6 overflow-hidden"
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-            <Link2 className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 flex items-center justify-center">
+            <Link2 className="w-4 h-4 text-[var(--brand-main)]" />
           </div>
           <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Consistency Chain</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-white">{chainLength}</span>
+          <span className="text-2xl font-bold text-[var(--theme-text-primary)]">{chainLength}</span>
           <span className="text-xs text-neutral-500 uppercase tracking-wider">day streak</span>
         </div>
       </div>
@@ -110,12 +110,12 @@ export default function PaperChain() {
                     className={`
                       w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
                       ${day.complete
-                        ? 'bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                        ? 'bg-[var(--brand-main)] text-[var(--bg-base)] shadow-[var(--shadow-sm)]'
                         : day.partial
                           ? 'bg-neutral-700 text-neutral-300 border-2 border-dashed border-neutral-500'
                           : 'bg-neutral-900 text-neutral-600 border border-neutral-800'
                       }
-                      ${isToday ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-black' : ''}
+                      ${isToday ? 'ring-2 ring-[var(--brand-main)]/60 ring-offset-2 ring-offset-[var(--bg-base)]' : ''}
                     `}
                   >
                     {day.complete ? (
@@ -129,8 +129,8 @@ export default function PaperChain() {
                   
                   {/* Tooltip */}
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    <div className="bg-black border border-white/20 rounded-lg px-2 py-1 text-xs whitespace-nowrap">
-                      <p className="text-white font-medium">{formatDate(day.date)}</p>
+                    <div className="surface-raised rounded-lg px-2 py-1 text-xs whitespace-nowrap">
+                      <p className="text-[var(--theme-text-primary)] font-medium">{formatDate(day.date)}</p>
                       <p className="text-neutral-400">{Math.round(day.completionRate)}% complete</p>
                     </div>
                   </div>
@@ -145,7 +145,7 @@ export default function PaperChain() {
                     className={`
                       w-4 h-1 origin-left
                       ${day.complete && chainData[index + 1]?.complete
-                        ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.3)]'
+                        ? 'bg-[var(--brand-main)] shadow-[var(--shadow-sm)]'
                         : day.complete || chainData[index + 1]?.complete
                           ? 'bg-neutral-600'
                           : 'bg-neutral-800 border-t border-dashed border-neutral-700'
@@ -160,10 +160,10 @@ export default function PaperChain() {
       </div>
 
       {/* Legend + Show All */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--theme-border)]">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-white" />
+            <div className="w-3 h-3 rounded-full bg-[var(--brand-main)]" />
             <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Complete</span>
           </div>
           <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
       {/* Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="glass p-4 rounded-xl text-center">
-          <p className="text-3xl font-bold text-white">{completeDays}</p>
+          <p className="text-3xl font-bold text-[var(--theme-text-primary)]">{completeDays}</p>
           <p className="text-xs text-neutral-500 uppercase tracking-wider mt-1">Complete Days</p>
         </div>
         <div className="glass p-4 rounded-xl text-center">
@@ -258,11 +258,11 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
           <p className="text-xs text-neutral-500 uppercase tracking-wider mt-1">Missed Days</p>
         </div>
         <div className="glass p-4 rounded-xl text-center">
-          <p className="text-3xl font-bold text-white">{Math.round(avgCompletion)}%</p>
+          <p className="text-3xl font-bold text-[var(--theme-text-primary)]">{Math.round(avgCompletion)}%</p>
           <p className="text-xs text-neutral-500 uppercase tracking-wider mt-1">Avg Completion</p>
         </div>
         <div className="glass p-4 rounded-xl text-center">
-          <p className="text-3xl font-bold text-white">{longestStreak}</p>
+          <p className="text-3xl font-bold text-[var(--theme-text-primary)]">{longestStreak}</p>
           <p className="text-xs text-neutral-500 uppercase tracking-wider mt-1">Best Streak</p>
         </div>
       </div>
@@ -273,19 +273,19 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
         <div className="h-[200px] min-h-[200px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={100}>
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" vertical={false} />
               <XAxis 
                 dataKey="date" 
                 tickFormatter={formatDate}
-                stroke="rgba(255,255,255,0.2)"
-                tick={{ fontSize: 10, fill: '#737373' }}
+                stroke="var(--theme-border)"
+                tick={{ fontSize: 10, fill: 'var(--theme-text-tertiary)' }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis 
-                stroke="rgba(255,255,255,0.2)"
-                tick={{ fontSize: 10, fill: '#737373' }}
+                stroke="var(--theme-border)"
+                tick={{ fontSize: 10, fill: 'var(--theme-text-tertiary)' }}
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
                 axisLine={false}
@@ -293,8 +293,8 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
               />
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: '#000', 
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  backgroundColor: 'var(--bg-base)', 
+                  border: '1px solid var(--theme-border)',
                   borderRadius: '8px'
                 }}
                 labelFormatter={formatDate}
@@ -303,8 +303,8 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
               <Area 
                 type="monotone" 
                 dataKey="rate" 
-                stroke="#fff" 
-                fill="rgba(255,255,255,0.1)"
+                stroke="var(--chart-6)" 
+                fill="color-mix(in oklab, var(--chart-6) 22%, transparent)"
                 strokeWidth={2}
               />
             </AreaChart>
@@ -334,13 +334,13 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
                       Week {weeks.length - weekIndex}: {formatWeekDate(week[0]?.date || '')}
                     </span>
                     {weekIndex > 0 && (
-                      <div className={`flex items-center gap-1 text-xs ${trend > 0 ? 'text-green-400' : trend < 0 ? 'text-red-400' : 'text-neutral-500'}`}>
+                      <div className={`flex items-center gap-1 text-xs ${trend > 0 ? 'text-[var(--color-success)]' : trend < 0 ? 'text-[var(--color-error)]' : 'text-neutral-500'}`}>
                         {trend > 0 ? <TrendingUp className="w-3 h-3" /> : trend < 0 ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                         {Math.abs(Math.round(trend))}%
                       </div>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-white">{Math.round(weekAvg)}%</span>
+                  <span className="text-sm font-bold text-[var(--theme-text-primary)]">{Math.round(weekAvg)}%</span>
                 </div>
                 <div className="flex gap-1">
                   {week.map((day, dayIndex) => (
@@ -349,7 +349,7 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
                       className={`
                         flex-1 h-8 rounded-md flex items-center justify-center text-xs font-medium
                         ${day.complete 
-                          ? 'bg-white text-black' 
+                          ? 'bg-[var(--brand-main)] text-[var(--bg-base)]' 
                           : day.partial 
                           ? 'bg-neutral-700 text-neutral-300' 
                           : 'bg-neutral-900 text-neutral-600'
@@ -369,4 +369,3 @@ function FullChainHistory({ data }: { data: PaperChainData[] }) {
     </div>
   );
 }
-

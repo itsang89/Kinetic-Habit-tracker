@@ -32,7 +32,7 @@ import {
   Zap,
   Star
 } from 'lucide-react';
-import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog } from '@/store/useKineticStore';
+import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog, MissReasonLog } from '@/store/useKineticStore';
 
 import { HABIT_ICON_MAP, HABIT_ICON_OPTIONS } from '@/lib/habitIcons';
 import BottomNav from '@/components/BottomNav';
@@ -49,10 +49,10 @@ export default function ProfilePage() {
   const { 
     theme, setTheme, getExportData, clearAllData, getJoinDate, 
     habits, habitLogs, moodLogs, userName, userIcon, updateUserProfile,
-    lastSyncedAt, isSyncing, syncToCloud, addHabit, logHabitCompletion, logMood
+    lastSyncedAt, isSyncing, syncToCloud, addHabit, logHabitCompletion, logMood, logMissReason, setWeeklyContractTarget
   } = store;
   
-  const { user, signOut } = useAuth();
+  const { user, isGuest, signOut } = useAuth();
   const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -105,6 +105,8 @@ export default function ProfilePage() {
           habits: Habit[];
           habitLogs: HabitLog[];
           moodLogs: MoodLog[];
+          missReasonLogs?: MissReasonLog[];
+          weeklyContractTarget?: number | null;
         };
         
         // Validate data structure
@@ -170,6 +172,24 @@ export default function ProfilePage() {
           if (date && mood.score >= 1 && mood.score <= 10) {
             await logMood(mood.score, date);
           }
+        }
+
+        // Import miss reason logs
+        if (Array.isArray(data.missReasonLogs)) {
+          for (const miss of data.missReasonLogs) {
+            if (miss.habitId && miss.reason && miss.date) {
+              const newHabitId = habitIdMap.get(miss.habitId);
+              if (newHabitId) {
+                await logMissReason(newHabitId, miss.reason, miss.date);
+              }
+            }
+          }
+        }
+
+        if (typeof data.weeklyContractTarget === 'number') {
+          setWeeklyContractTarget(data.weeklyContractTarget);
+        } else if (data.weeklyContractTarget === null) {
+          setWeeklyContractTarget(null);
         }
         
         setImportSuccess(true);
@@ -237,10 +257,10 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen pb-28 selection:bg-[var(--theme-foreground)] selection:text-[var(--theme-background)]">
+      <div className="min-h-screen pb-28 selection:bg-[var(--brand-main)] selection:text-[var(--bg-base)]">
         {/* Background decoration */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-[var(--theme-foreground)]/[0.03] rounded-full blur-3xl -translate-y-1/2" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-[var(--brand-main)]/[0.10] rounded-full blur-3xl -translate-y-1/2" />
         </div>
 
         <div className="relative z-10 max-w-lg mx-auto px-4 pb-12 pt-4">
@@ -261,7 +281,7 @@ export default function ProfilePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="glass p-8 mb-6"
+            className="glass depth-hover p-8 mb-6"
           >
             <div className="flex flex-col items-center text-center">
               {/* Avatar */}
@@ -271,8 +291,8 @@ export default function ProfilePage() {
                 onClick={() => setShowEditProfile(true)}
                 className="w-24 h-24 rounded-full bg-[var(--theme-foreground)] flex items-center justify-center mb-4 shadow-lg cursor-pointer group relative overflow-hidden"
               >
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Edit3 className="w-6 h-6 text-white" />
+                <div className="absolute inset-0 bg-[var(--bg-base)]/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Edit3 className="w-6 h-6 text-[var(--theme-text-primary)]" />
                 </div>
                 <UserIconComponent className="w-12 h-12 text-[var(--theme-background)]" />
               </motion.div>
@@ -283,12 +303,12 @@ export default function ProfilePage() {
               >
                 {userName}
               </h2>
-              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">{user?.email}</p>
+              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">{user?.email ?? 'Guest mode'}</p>
               <p className="text-[10px] text-[var(--theme-text-muted)] uppercase tracking-wider mb-4">Member since {joinDate}</p>
 
               {/* Sync Status */}
               <div className="flex items-center gap-4 mb-6">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${lastSyncedAt ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${lastSyncedAt ? 'bg-[var(--color-success)]/12 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/14 text-[var(--color-warning)]'}`}>
                   {lastSyncedAt ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
                   {lastSyncedAt ? 'Cloud Synced' : 'Local Only'}
                 </div>
@@ -496,10 +516,10 @@ export default function ProfilePage() {
             
             <button
               onClick={() => setShowLogoutConfirm(true)}
-              className="flex items-center justify-center gap-2 mx-auto text-red-500 hover:text-red-400 transition-colors"
+              className="flex items-center justify-center gap-2 mx-auto text-[var(--color-error)] hover:brightness-110 transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">Log Out</span>
+              <span className="text-sm font-medium">{isGuest ? 'Exit Guest Mode' : 'Log Out'}</span>
             </button>
           </motion.div>
         </div>
@@ -511,7 +531,7 @@ export default function ProfilePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-base)]/70 backdrop-blur-sm"
               onClick={() => setShowLogoutConfirm(false)}
             >
               <motion.div
@@ -521,9 +541,11 @@ export default function ProfilePage() {
                 className="glass p-6 max-w-sm w-full"
                 onClick={e => e.stopPropagation()}
               >
-                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-2">Clear All Data?</h3>
+                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-2">{isGuest ? 'Exit Guest Mode?' : 'Clear All Data?'}</h3>
                 <p className="text-sm text-[var(--theme-text-secondary)] mb-6">
-                  This will permanently delete all your habits, logs, and mood entries. This action cannot be undone.
+                  {isGuest
+                    ? 'This will clear guest data and return you to sign in.'
+                    : 'This will permanently delete all your habits, logs, and mood entries. This action cannot be undone.'}
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -534,7 +556,7 @@ export default function ProfilePage() {
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="flex-1 py-3 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+                    className="flex-1 py-3 rounded-xl bg-[var(--color-error)] text-[var(--bg-base)] font-medium hover:brightness-95 transition-colors"
                   >
                     Delete All
                   </button>
@@ -551,7 +573,7 @@ export default function ProfilePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-base)]/80 backdrop-blur-sm"
               onClick={() => setShowEditProfile(false)}
             >
               <motion.div
@@ -629,4 +651,3 @@ export default function ProfilePage() {
     </ProtectedRoute>
   );
 }
-

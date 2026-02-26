@@ -45,11 +45,11 @@ export default function HabitHeatmap() {
   }, [mounted, habitLogs]);
   
   const getIntensityColor = (count: number) => {
-    if (count === 0) return 'bg-neutral-900 border border-white/[0.05]';
-    if (count === 1) return 'bg-neutral-700 border border-neutral-600';
-    if (count === 2) return 'bg-neutral-500 border border-neutral-400';
-    if (count === 3) return 'bg-neutral-300 border border-neutral-200';
-    return 'bg-white border-white shadow-[0_0_8px_rgba(255,255,255,0.4)]';
+    if (count === 0) return 'bg-[var(--bg-base)] border border-[var(--theme-border)]';
+    if (count === 1) return 'bg-[var(--brand-900)] border border-[var(--brand-800)]';
+    if (count === 2) return 'bg-[var(--brand-700)] border border-[var(--brand-600)]';
+    if (count === 3) return 'bg-[var(--brand-500)] border border-[var(--brand-400)]';
+    return 'bg-[var(--brand-main)] border border-[var(--brand-main)] shadow-[var(--shadow-sm)]';
   };
 
   const weeks: typeof heatmapData[] = [];
@@ -84,21 +84,21 @@ export default function HabitHeatmap() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="glass p-8"
+      className="glass depth-hover p-8"
     >
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-             <Calendar className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 flex items-center justify-center">
+             <Calendar className="w-4 h-4 text-[var(--brand-main)]" />
           </div>
-          <h2 className="text-sm font-semibold text-white uppercase tracking-widest">Consistency Map</h2>
+          <h2 className="text-sm font-semibold text-[var(--theme-text-primary)] uppercase tracking-widest">Consistency Map</h2>
         </div>
         <div className="flex items-center gap-2">
             <span className="text-[10px] text-neutral-500 uppercase tracking-wider">Less</span>
             <div className="flex gap-1">
-               <div className="w-2 h-2 rounded-sm bg-neutral-900 border border-white/10" />
-               <div className="w-2 h-2 rounded-sm bg-neutral-500" />
-               <div className="w-2 h-2 rounded-sm bg-white" />
+               <div className="w-2 h-2 rounded-sm bg-[var(--bg-base)] border border-[var(--theme-border)]" />
+               <div className="w-2 h-2 rounded-sm bg-[var(--brand-700)]" />
+               <div className="w-2 h-2 rounded-sm bg-[var(--brand-main)]" />
             </div>
             <span className="text-[10px] text-neutral-500 uppercase tracking-wider">More</span>
         </div>

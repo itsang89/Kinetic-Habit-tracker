@@ -157,7 +157,7 @@ export default function KineticSlider({ value, max, onChange, onComplete, unit =
           onDragEnd={handleDragEnd}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 1.2, cursor: 'grabbing' }}
-          className="absolute top-1 bottom-1 w-2 bg-[var(--theme-background)] rounded-full shadow-[0_0_10px_rgba(0,0,0,0.3)] z-10 cursor-grab ml-[-1px] border border-[var(--theme-foreground)]"
+          className="absolute top-1 bottom-1 w-2 bg-[var(--theme-background)] rounded-full shadow-[var(--shadow-sm)] z-10 cursor-grab ml-[-1px] border border-[var(--brand-main)]"
         >
             <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-0.5 h-4 bg-[var(--theme-foreground)] rounded-full" />
@@ -177,4 +177,3 @@ export default function KineticSlider({ value, max, onChange, onComplete, unit =
     </div>
   );
 }
-
