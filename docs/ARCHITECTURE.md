@@ -4,7 +4,7 @@ This document outlines the technical architecture of Kinetic.
 
 ## Overview
 
-Kinetic is a client-first web application built with Next.js. It prioritizes a fast, offline-capable experience using local state persistence, with optional cloud synchronization.
+Kinetic is a client-first web application built with Next.js. It prioritizes a fast, offline-capable experience using local state persistence, with local-only persistence.
 
 ## 🧠 State Management (Zustand)
 
@@ -29,12 +29,12 @@ Kinetic uses a custom algorithm to calculate user "Momentum":
 
 ## ☁️ Cloud Synchronization
 
-The app is integrated with **Supabase** for optional cloud sync.
+The app is runs fully local without cloud sync.
 
 ### Sync Strategy
-- **Debounced Sync**: To avoid excessive writes, the app waits for a period of inactivity (`SYNC_DEBOUNCE_MS`) before pushing local changes to Supabase.
-- **Manual Initialization**: When the app starts, it attempts to fetch the latest state from the cloud and merges it with the local state.
-- **Conflict Resolution**: Currently, the app follows a "last-write-wins" or "cloud-overwrites-local" strategy upon initialization.
+- **Debounced Sync**: To avoid excessive writes, the app waits for a period of inactivity (`SYNC_DEBOUNCE_MS`) before persisting local changes to browser storage.
+- **Manual Initialization**: When the app starts, it attempts to load persisted local state from browser storage.
+- **Conflict Resolution**: Currently, the app follows a "last-write-wins" or local-first strategy.
 
 ## 📊 Analytics & Trends
 

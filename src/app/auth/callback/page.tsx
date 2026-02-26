@@ -2,56 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Verifying your email...');
+  const [message, setMessage] = useState('Auth callback is disabled in local-only mode.');
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      if (!supabase) {
-        setStatus('error');
-        setMessage('Authentication service is not available');
-        return;
-      }
-
-      try {
-        // Handle the auth callback
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
-        }
-
-        if (data.session) {
-          setStatus('success');
-          setMessage('Email confirmed! Redirecting...');
-          
-          // Wait a moment to show success message, then redirect
-          setTimeout(() => {
-            router.push('/');
-          }, 2000);
-        } else {
-          setStatus('error');
-          setMessage('No session found. Please try signing in again.');
-          setTimeout(() => {
-            router.push('/login');
-          }, 3000);
-        }
-      } catch (err) {
-        setStatus('error');
-        setMessage(err instanceof Error ? err.message : 'An error occurred during verification');
-        setTimeout(() => {
-          router.push('/login');
-        }, 3000);
-      }
-    };
-
-    handleAuthCallback();
+    const timer = setTimeout(() => {
+      setStatus('error');
+      setMessage('Authentication is disabled. Redirecting to login screen...');
+      setTimeout(() => router.push('/login'), 1500);
+    }, 600);
+    return () => clearTimeout(timer);
   }, [router]);
 
   return (
@@ -75,7 +40,7 @@ export default function AuthCallbackPage() {
           <>
             <CheckCircle className="w-12 h-12 text-[var(--color-success)] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-[var(--theme-text-primary)] mb-2">
-              Email Confirmed!
+              Complete
             </h1>
             <p className="text-[var(--theme-text-secondary)]">{message}</p>
           </>
@@ -85,7 +50,7 @@ export default function AuthCallbackPage() {
           <>
             <XCircle className="w-12 h-12 text-[var(--color-error)] mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-[var(--theme-text-primary)] mb-2">
-              Verification Failed
+              Callback Disabled
             </h1>
             <p className="text-[var(--theme-text-secondary)] mb-4">{message}</p>
             <button
@@ -100,4 +65,3 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
-

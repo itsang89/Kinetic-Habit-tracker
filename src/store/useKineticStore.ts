@@ -1,12 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { syncToCloud, fetchFromCloud } from '@/lib/sync';
-import { supabase } from '@/lib/supabase';
 
 import { MOMENTUM_CONSTANTS } from '@/lib/constants';
-
-// Define a module-level variable for sync timeout
-let syncTimeout: NodeJS.Timeout | null = null;
 
 export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 
@@ -571,71 +566,16 @@ export const useKineticStore = create<KineticState>()(
       },
 
       syncToCloud: async () => {
-        if (!supabase) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Clear any existing timeout
-        if (syncTimeout) {
-          clearTimeout(syncTimeout);
-        }
-
-        // Set new timeout for debounced sync
-        syncTimeout = setTimeout(async () => {
-          set({ isSyncing: true, syncError: null });
-          try {
-            const result = await syncToCloud(user.id, get());
-            
-            if (result.success) {
-              set({ lastSyncedAt: new Date().toISOString(), isSyncing: false });
-            } else {
-              const errorMsg = result.error?.message || 'Sync failed';
-              set({ syncError: errorMsg, isSyncing: false });
-            }
-          } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : 'Sync failed';
-            set({ syncError: errorMsg, isSyncing: false });
-          }
-          syncTimeout = null;
-        }, MOMENTUM_CONSTANTS.SYNC_DEBOUNCE_MS);
+        set({ isSyncing: false, syncError: null });
       },
 
       fetchFromCloud: async () => {
-        if (!supabase) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        set({ isSyncing: true, syncError: null });
-        const result = await fetchFromCloud(user.id);
-        
-        if (result.success && result.data) {
-          set({
-            habits: result.data.habits,
-            habitLogs: result.data.habitLogs,
-            moodLogs: result.data.moodLogs,
-            userName: result.data.profile?.userName || get().userName,
-            userIcon: result.data.profile?.userIcon || get().userIcon,
-            theme: result.data.profile?.theme || get().theme,
-            lastSyncedAt: new Date().toISOString(),
-            isSyncing: false
-          });
-        } else {
-          const errorMsg = result.error?.message || 'Fetch failed';
-          set({ syncError: errorMsg, isSyncing: false });
-        }
+        set({ isSyncing: false, syncError: null });
       },
 
       initializeStore: async () => {
         // Apply daily decay first to ensure data is up to date
         get().applyDailyDecay();
-        
-        if (!supabase) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await get().fetchFromCloud();
-          // Apply decay again after fetching in case decay wasn't applied on other device
-          get().applyDailyDecay();
-        }
       },
 
       calculateMomentumScore: () => {

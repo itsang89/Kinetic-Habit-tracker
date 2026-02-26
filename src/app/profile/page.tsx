@@ -14,7 +14,7 @@ import {
   HelpCircle, 
   Info, 
   ChevronRight,
-  LogOut,
+  Trash2,
   ArrowLeft,
   Edit3,
   X,
@@ -39,8 +39,6 @@ import BottomNav from '@/components/BottomNav';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { useAuth } from '@/contexts/AuthContext';
-import { Cloud, CloudOff, RefreshCcw } from 'lucide-react';
 
 import { useMounted } from '@/hooks/useMounted';
 
@@ -49,10 +47,8 @@ export default function ProfilePage() {
   const { 
     theme, setTheme, getExportData, clearAllData, getJoinDate, 
     habits, habitLogs, moodLogs, userName, userIcon, updateUserProfile,
-    lastSyncedAt, isSyncing, syncToCloud, addHabit, logHabitCompletion, logMood, logMissReason, setWeeklyContractTarget
+    addHabit, logHabitCompletion, logMood, logMissReason, setWeeklyContractTarget
   } = store;
-  
-  const { user, isGuest, signOut } = useAuth();
   const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -247,8 +243,7 @@ export default function ProfilePage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleLogout = () => {
     clearAllData();
     setShowLogoutConfirm(false);
   };
@@ -303,24 +298,8 @@ export default function ProfilePage() {
               >
                 {userName}
               </h2>
-              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">{user?.email ?? 'Guest mode'}</p>
+              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">Local profile</p>
               <p className="text-[10px] text-[var(--theme-text-muted)] uppercase tracking-wider mb-4">Member since {joinDate}</p>
-
-              {/* Sync Status */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${lastSyncedAt ? 'bg-[var(--color-success)]/12 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/14 text-[var(--color-warning)]'}`}>
-                  {lastSyncedAt ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
-                  {lastSyncedAt ? 'Cloud Synced' : 'Local Only'}
-                </div>
-                <button 
-                  onClick={() => syncToCloud()}
-                  disabled={isSyncing}
-                  className="p-2 rounded-full hover:bg-[var(--theme-foreground)]/10 transition-colors disabled:opacity-50"
-                  title="Sync now"
-                >
-                  <RefreshCcw className={`w-3.5 h-3.5 text-[var(--theme-text-secondary)] ${isSyncing ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
               
               {/* Quick Stats */}
               <div className="flex gap-8 mt-6 pt-6 border-t border-[var(--theme-border)] w-full justify-center">
@@ -453,7 +432,7 @@ export default function ProfilePage() {
 
               {/* Privacy */}
               <button
-                onClick={() => alert('Privacy Policy\n\nAll your data is stored locally in your browser. When you sign in, data is synced to Supabase (encrypted in transit and at rest).\n\nWe do not share your data with third parties. Your habits, logs, and mood entries are private to you.')}
+                onClick={() => alert('Privacy Policy\n\nAll your data is stored locally in your browser.\n\nWe do not share your data with third parties. Your habits, logs, and mood entries stay on this device unless you export them.')}
                 className="w-full flex items-center justify-between p-4 hover:bg-[var(--theme-foreground)]/5 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -518,8 +497,8 @@ export default function ProfilePage() {
               onClick={() => setShowLogoutConfirm(true)}
               className="flex items-center justify-center gap-2 mx-auto text-[var(--color-error)] hover:brightness-110 transition-colors"
             >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-medium">{isGuest ? 'Exit Guest Mode' : 'Log Out'}</span>
+              <Trash2 className="w-4 h-4" />
+              <span className="text-sm font-medium">Clear Local Data</span>
             </button>
           </motion.div>
         </div>
@@ -541,11 +520,9 @@ export default function ProfilePage() {
                 className="glass p-6 max-w-sm w-full"
                 onClick={e => e.stopPropagation()}
               >
-                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-2">{isGuest ? 'Exit Guest Mode?' : 'Clear All Data?'}</h3>
+                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-2">Clear All Data?</h3>
                 <p className="text-sm text-[var(--theme-text-secondary)] mb-6">
-                  {isGuest
-                    ? 'This will clear guest data and return you to sign in.'
-                    : 'This will permanently delete all your habits, logs, and mood entries. This action cannot be undone.'}
+                  This will permanently delete all your habits, logs, and mood entries from local storage. This action cannot be undone.
                 </p>
                 <div className="flex gap-3">
                   <button

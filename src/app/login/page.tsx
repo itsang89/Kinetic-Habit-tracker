@@ -2,10 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles, User } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -15,9 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
-  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const { continueAsGuest } = useAuth();
   const router = useRouter();
 
   const validateForm = (): string | null => {
@@ -52,7 +48,7 @@ export default function LoginPage() {
     return null;
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -65,43 +61,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (!supabase) {
-      setError('Authentication service is not available');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          }
-        });
-        if (error) throw error;
-        alert('Check your email for the confirmation link!');
-      } else if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
-        });
-        if (error) throw error;
-        setResetEmailSent(true);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        router.push('/');
-      }
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred');
-      }
-    } finally {
-      setLoading(false);
-    }
+    setError('Authentication is currently disabled. Use "Continue to App".');
+    setLoading(false);
   };
 
   return (
@@ -125,7 +86,7 @@ export default function LoginPage() {
             {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
           </h1>
           <p className="text-sm text-[var(--theme-text-secondary)]">
-            {mode === 'login' ? 'Sync your momentum across devices' : mode === 'signup' ? 'Start your kinetic journey today' : 'Enter your email to receive a password reset link'}
+            {mode === 'login' ? 'This screen is reserved for future auth support' : mode === 'signup' ? 'Sign-up is disabled in this local-only build' : 'Password reset is disabled in this local-only build'}
           </p>
         </div>
         
@@ -172,16 +133,6 @@ export default function LoginPage() {
             </div>
           )}
           
-          {resetEmailSent && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="text-[var(--color-success)] text-sm font-medium px-1 bg-[var(--color-success)]/12 p-3 rounded-xl"
-            >
-              Password reset email sent! Check your inbox.
-            </motion.div>
-          )}
-          
           {validationError && (
             <motion.p 
               initial={{ opacity: 0, height: 0 }}
@@ -205,7 +156,7 @@ export default function LoginPage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             type="submit"
-            disabled={loading || resetEmailSent}
+            disabled={loading}
             className="w-full py-4 rounded-2xl bg-[var(--brand-main)] text-[var(--bg-base)] font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-2 hover:bg-[var(--brand-hover)] transition-all disabled:opacity-50 mt-6"
           >
             {loading ? (
@@ -213,7 +164,7 @@ export default function LoginPage() {
             ) : (
               <>
                 {mode === 'login' ? <LogIn className="w-4 h-4" /> : mode === 'signup' ? <UserPlus className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Join Kinetic' : 'Send Reset Link'}
+                {mode === 'login' ? 'Sign In (Disabled)' : mode === 'signup' ? 'Join Kinetic (Disabled)' : 'Send Reset Link (Disabled)'}
               </>
             )}
           </motion.button>
@@ -223,13 +174,12 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              continueAsGuest();
               router.push('/');
             }}
             className="w-full py-3 mt-4 rounded-2xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[var(--theme-foreground)]/5 transition-colors"
           >
             <User className="w-4 h-4" />
-            Continue as Guest
+            Continue to App
           </button>
         )}
 
@@ -238,7 +188,6 @@ export default function LoginPage() {
             <button
               onClick={() => {
                 setMode('login');
-                setResetEmailSent(false);
                 setError('');
                 setValidationError(null);
               }}
@@ -251,7 +200,6 @@ export default function LoginPage() {
             <button
               onClick={() => {
                 setMode(mode === 'login' ? 'signup' : 'login');
-                setResetEmailSent(false);
                 setError('');
                 setValidationError(null);
               }}

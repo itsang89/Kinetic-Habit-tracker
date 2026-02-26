@@ -38,21 +38,11 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see the app in act
 - **State Management**: Zustand (with localStorage persistence)
 - **Icons**: Lucide React
 - **Charts**: Recharts
-- **Database**: Supabase (Backend Ready)
-
-## ⚙️ Configuration
-
-Kinetic is "Backend Ready" with Supabase. To enable cloud sync, create a `.env.local` file with:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-```
 
 ## 🏗️ Architecture
 
 - **State Management**: Uses Zustand for a global reactive state. The store is persisted to `localStorage` via the `persist` middleware.
-- **Data Synchronization**: Synchronizes with Supabase when credentials are provided. Uses a debounced sync strategy to minimize API calls.
+- **Data Storage**: Local-first persistence in browser `localStorage`.
 - **Momentum Logic**: Implements a daily decay system for missed habits and bonuses for completions.
 
 For more details, see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
@@ -63,7 +53,6 @@ For more details, see [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 src/
 ├── app/          # Next.js App Router pages
 ├── components/   # UI components and feature-specific blocks
-├── contexts/     # React Context providers (Auth, etc.)
 ├── hooks/        # Custom React hooks
 ├── lib/          # Utilities, constants, and calculations
 └── store/        # Zustand state store

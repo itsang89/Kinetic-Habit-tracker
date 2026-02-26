@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
-import { AuthProvider } from '@/contexts/AuthContext';
 import { ToastProvider } from '@/components/ToastProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -20,11 +19,9 @@ export default function RootLayout({
       <body className="antialiased">
         <ErrorBoundary>
           <ThemeProvider>
-            <AuthProvider>
-              <ToastProvider>
-                {children}
-              </ToastProvider>
-            </AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </ThemeProvider>
         </ErrorBoundary>
       </body>

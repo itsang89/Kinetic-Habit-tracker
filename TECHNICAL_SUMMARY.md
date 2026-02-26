@@ -15,13 +15,13 @@ Kinetic is a habit and mood tracker focused on daily execution, streaks, and mom
 ### Architecture
 - **Client-first web app** using Next.js App Router.
 - **Local persistence** via Zustand with `localStorage`.
-- **Optional cloud sync** with Supabase (auth + database). No custom backend API in this repo.
+- **Local-only storage** via browser `localStorage`. No custom backend API in this repo.
 
 ### Tech Stack and Key Dependencies
 - **Next.js (App Router)**, **React 19**
 - **Tailwind CSS v4** + CSS variables
 - **Zustand** for state management and persistence
-- **Supabase** for auth and optional sync
+- No auth backend or cloud sync dependency
 - **Framer Motion** for animations
 - **Recharts** for charts
 - **Lucide React** for icons
@@ -31,8 +31,6 @@ Relevant files:
 - `/Users/isaac/VibeCode/Projects/kinetic habit app/src/app/layout.tsx`
 - `/Users/isaac/VibeCode/Projects/kinetic habit app/src/app/globals.css`
 - `/Users/isaac/VibeCode/Projects/kinetic habit app/src/store/useKineticStore.ts`
-- `/Users/isaac/VibeCode/Projects/kinetic habit app/src/lib/supabase.ts`
-- `/Users/isaac/VibeCode/Projects/kinetic habit app/src/lib/sync.ts`
 
 ---
 
@@ -196,12 +194,12 @@ Main actions:
 - Derived data and charts computed in components or selectors.
 
 ### API Design and Auth
-- No custom API endpoints; Supabase client used directly.
-- Auth: Supabase email/password with confirmation and reset flows.
+- No custom API endpoints; all data is managed client-side.
+- Auth is currently disabled in this local-only build.
 - Sync: debounced upserts of habits, logs, mood logs, and user profile.
 
 ### Third-Party Integrations
-- Supabase for auth and optional sync.
+- No auth or cloud sync backend.
 - Recharts for charts.
 - Framer Motion for animation.
 

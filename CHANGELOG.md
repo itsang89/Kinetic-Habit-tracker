@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stats & Trends dashboard with Recharts.
 - Shield protection for habit streaks.
 - Mood tracking and correlation analysis.
-- Supabase integration for cloud sync.
+- Local-only persistence with Zustand localStorage.
 - Comprehensive documentation (`README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `llms.txt`).
 
 ### Changed
