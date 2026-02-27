@@ -70,6 +70,7 @@ export interface SkipLog {
   id: string;
   habitId: string;
   dateKey: string; // YYYY-MM-DD
+  reason?: string;
   createdAt: string;
   deletedAt?: string;
 }
@@ -129,7 +130,7 @@ interface KineticState {
   logHabitCompletion: (habitId: string, value?: number, dateKey?: string) => Promise<void>;
   removeHabitCompletion: (habitId: string, dateKey?: string) => Promise<void>;
   logMood: (score: number, dateKey?: string) => Promise<void>;
-  logSkip: (habitId: string, dateKey: string) => Promise<void>;
+  logSkip: (habitId: string, dateKey: string, reason?: string) => Promise<void>;
   removeSkip: (habitId: string, dateKey: string) => Promise<void>;
   setWeeklyContractTarget: (target: number | null) => void;
   setSelectedDate: (dateKey: string) => void;
@@ -203,7 +204,7 @@ const recalculateStreak = (habit: Habit, habitLogs: HabitLog[], skipLogs: SkipLo
   const parseDate = (dStr: string) => {
     if (dStr.includes('T')) return new Date(dStr);
     const [y, m, d] = dStr.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
+    return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1);
   };
 
   const habitCreatedAt = parseDate(habit.createdAt);
@@ -450,7 +451,9 @@ export const useKineticStore = create<KineticState>()(
             logs.push({
                 id: generateId(),
                 habitId,
-                completedAt: dateKey ? `${dateKey}T12:00:00` : `${getLocalDateKey()}T${new Date().toLocaleTimeString('sv')}`,
+                completedAt: targetDateKey === getLocalDateKey() 
+                  ? `${targetDateKey}T${new Date().toLocaleTimeString('sv')}`
+                  : `${targetDateKey}T12:00:00`,
                 value,
             });
         }
@@ -488,6 +491,7 @@ export const useKineticStore = create<KineticState>()(
         if (logToRemoveIndex === -1) return;
 
         const logToRemove = state.habitLogs[logToRemoveIndex];
+        if (!logToRemove) return;
         const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (habit) {
           const now = new Date().toISOString();
@@ -528,14 +532,16 @@ export const useKineticStore = create<KineticState>()(
           const newLog: MoodLog = {
             id: generateId(),
             score,
-            loggedAt: dateKey ? `${dateKey}T21:00:00` : `${getLocalDateKey()}T${new Date().toLocaleTimeString('sv')}`,
+            loggedAt: targetDateKey === getLocalDateKey()
+              ? `${targetDateKey}T${new Date().toLocaleTimeString('sv')}`
+              : `${targetDateKey}T21:00:00`,
           };
           set((state) => ({ moodLogs: [...state.moodLogs, newLog] }));
         }
         debouncedSyncFn(get);
       },
 
-      logSkip: async (habitId, dateKey) => {
+      logSkip: async (habitId, dateKey, reason) => {
         const state = get();
         const targetDateKey = dateKey || state.selectedDate;
         const now = new Date().toISOString();
@@ -546,12 +552,22 @@ export const useKineticStore = create<KineticState>()(
         const existingSkip = state.skipLogs.find(
           (l) => !l.deletedAt && l.habitId === habitId && l.dateKey === targetDateKey
         );
-        if (existingSkip) return;
+        if (existingSkip) {
+          // If skip exists, update reason
+          set((state) => ({
+            skipLogs: state.skipLogs.map((l) =>
+              l.id === existingSkip.id ? { ...l, reason } : l
+            ),
+          }));
+          debouncedSyncFn(get);
+          return;
+        }
 
         const newSkip: SkipLog = {
           id: generateId(),
           habitId,
           dateKey: targetDateKey,
+          reason,
           createdAt: now,
         };
 

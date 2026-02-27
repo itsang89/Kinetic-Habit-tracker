@@ -22,7 +22,7 @@ export const getCompletionStatus = (
   
   // Parse date key
   const [year, month, day] = dateKey.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
   const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
 
   // Helper to parse dates
@@ -30,7 +30,7 @@ export const getCompletionStatus = (
     if (!dStr) return new Date();
     if (dStr.includes('T')) return new Date(dStr);
     const [y, m, d] = dStr.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
+    return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1);
   };
 
   const habitCreatedAt = parseDate(habit.createdAt);

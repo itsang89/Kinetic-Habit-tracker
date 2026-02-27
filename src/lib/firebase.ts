@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
+  Firestore,
   getFirestore, 
   initializeFirestore, 
   persistentLocalCache, 
@@ -21,7 +22,7 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // Initialize Firestore with offline persistence on the client
-let db;
+let db: Firestore;
 if (typeof window !== 'undefined') {
   try {
     // Try to initialize with persistence first

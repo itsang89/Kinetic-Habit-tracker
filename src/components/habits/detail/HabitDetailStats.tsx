@@ -17,7 +17,7 @@ export default function HabitDetailStats({ habit, successRate }: HabitDetailStat
     >
       <div className="text-center">
         <div className="flex items-center justify-center gap-1.5 mb-0.5">
-          <Flame className="w-4 h-4 text-[var(--theme-text-primary)]" fill="currentColor" />
+          <Flame className="w-4 h-4 text-[#FF5733]" fill="currentColor" />
           <span className="text-xl font-bold text-[var(--theme-text-primary)]">{habit.streak}</span>
         </div>
         <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider">Current Streak</p>

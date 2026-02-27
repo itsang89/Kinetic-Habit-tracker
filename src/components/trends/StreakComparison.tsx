@@ -75,7 +75,7 @@ export default function StreakComparison() {
         {/* Current streak */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 mb-2">
-            <Flame className="w-6 h-6 text-[var(--theme-text-primary)]" fill="currentColor" />
+            <Flame className="w-6 h-6 text-[#FF5733]" fill="currentColor" />
             <span className="text-5xl font-bold text-[var(--theme-text-primary)]">{currentStreak}</span>
           </div>
           <p className="text-[var(--theme-text-secondary)] text-xs uppercase tracking-wider">Current Streak</p>
@@ -172,7 +172,7 @@ export default function StreakComparison() {
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1">
-                      <Flame className="w-5 h-5 text-[var(--theme-text-primary)]" fill={habit.streak > 0 ? 'currentColor' : 'transparent'} />
+                      <Flame className="w-5 h-5 text-[#FF5733]" fill={habit.streak > 0 ? 'currentColor' : 'transparent'} />
                       <span className="text-2xl font-bold text-[var(--theme-text-primary)]">{habit.streak}</span>
                     </div>
                     <p className="text-[10px] text-[var(--theme-text-secondary)]">current</p>

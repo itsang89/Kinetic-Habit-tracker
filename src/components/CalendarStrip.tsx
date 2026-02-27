@@ -73,7 +73,7 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
         if (!dStr) return new Date();
         if (dStr.includes('T')) return new Date(dStr);
         const [y, m, d] = dStr.split('-').map(Number);
-        return new Date(y, (m || 1) - 1, d || 1);
+        return new Date(y ?? 0, ((m ?? 1) - 1), d ?? 1);
       };
       const habitCreatedDate = parseDate(h.createdAt);
       habitCreatedDate.setHours(0, 0, 0, 0);

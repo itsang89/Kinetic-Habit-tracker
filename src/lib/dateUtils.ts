@@ -7,7 +7,7 @@ export const getLocalDateKey = (date: Date = new Date()): string => {
 
 export const formatDisplayDate = (dateKey: string): string => {
   const [year, month, day] = dateKey.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
   const today = new Date();
   const todayKey = getLocalDateKey(today);
 

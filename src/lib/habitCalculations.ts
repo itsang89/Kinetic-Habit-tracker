@@ -14,7 +14,7 @@ export function calculateHabitStats(habit: Habit, habitLogs: HabitLog[], skipLog
   const parseDate = (dStr: string) => {
     if (dStr.includes('T')) return new Date(dStr);
     const [y, m, d] = dStr.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
+    return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1);
   };
 
   const habitCreatedAt = parseDate(habit.createdAt);
@@ -64,7 +64,7 @@ export function generateCalendarData(habit: Habit, habitLogs: HabitLog[], skipLo
   const parseDate = (dStr: string) => {
     if (dStr.includes('T')) return new Date(dStr);
     const [y, m, d] = dStr.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
+    return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1);
   };
 
   const habitCreatedAt = parseDate(habit.createdAt);

@@ -65,7 +65,7 @@ export default function CompactStats() {
            <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{Math.round(momentumScore)}</p>
         </div>
         <div className="w-10 h-10 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center">
-          <Flame className="w-5 h-5 text-[var(--brand-main)]" />
+          <Flame className="w-5 h-5 text-[#FF5733]" fill="currentColor" />
         </div>
       </motion.div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, X } from 'lucide-react';
 
@@ -25,7 +26,13 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   isDestructive = false,
 }: ConfirmDialogProps) {
-  return (
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const dialogContent = (
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -83,4 +90,7 @@ export default function ConfirmDialog({
       )}
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(dialogContent, document.body);
 }

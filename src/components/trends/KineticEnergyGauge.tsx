@@ -332,7 +332,7 @@ export default function KineticEnergyGauge() {
               <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider">Total Done</p>
             </div>
             <div className="p-4 rounded-xl bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] text-center">
-              <Flame className="w-6 h-6 text-[var(--theme-text-secondary)] mx-auto mb-2" />
+              <Flame className="w-6 h-6 text-[#FF5733] mx-auto mb-2" fill="currentColor" />
               <p className="text-3xl font-bold text-[var(--theme-text-primary)]">{stats.longestStreak}</p>
               <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider">Best Streak</p>
             </div>
