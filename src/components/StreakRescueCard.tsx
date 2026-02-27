@@ -1,10 +1,13 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ShieldAlert, ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { DayOfWeek, useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
 import { useMounted } from '@/hooks/useMounted';
 
 interface StreakRescueCardProps {
@@ -12,7 +15,7 @@ interface StreakRescueCardProps {
 }
 
 export default function StreakRescueCard({ date }: StreakRescueCardProps) {
-  const { habits, getHabitProgress } = useKineticStore();
+  const { habits, getHabitProgress, habitLogs, skipLogs } = useKineticStore();
   const mounted = useMounted();
 
   const { rescueList, isToday } = useMemo(() => {
@@ -21,21 +24,19 @@ export default function StreakRescueCard({ date }: StreakRescueCardProps) {
     const selectedDate = new Date(`${date}T12:00:00`);
     const viewDate = new Date(selectedDate);
     viewDate.setHours(0, 0, 0, 0);
-    const today = new Date().toISOString().split('T')[0] || '';
+    const today = getLocalDateKey();
     const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][selectedDate.getDay()] as DayOfWeek;
 
     const dueHabits = habits
-      .filter((h) => !h.isArchived && h.schedule.includes(dayOfWeek))
-      .filter((h) => {
-        const created = new Date(h.createdAt);
-        created.setHours(0, 0, 0, 0);
-        return created <= viewDate;
-      })
+      .filter((h) => !h.deletedAt && !h.isArchived)
       .map((habit) => {
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(date));
+        const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === date);
+        const status = getCompletionStatus(log, skipLog, habit, date);
         const progress = getHabitProgress(habit.id, date);
-        return { habit, progress };
+        return { habit, status, progress };
       })
-      .filter(({ progress }) => progress.percent < 100)
+      .filter(({ status }) => status === 'missed' || status === 'partial')
       .sort((a, b) => b.habit.streak - a.habit.streak)
       .slice(0, 3);
 

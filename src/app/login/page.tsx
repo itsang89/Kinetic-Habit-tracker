@@ -1,9 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles, User } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles, Chrome } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [validationError, setValidationError] = useState<string | null>(null);
   const router = useRouter();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordReset } = useAuth();
 
   const validateForm = (): string | null => {
     // Validate email
@@ -48,7 +51,7 @@ export default function LoginPage() {
     return null;
   };
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -61,8 +64,36 @@ export default function LoginPage() {
       return;
     }
 
-    setError('Authentication is currently disabled. Use "Continue to App".');
-    setLoading(false);
+    try {
+      if (mode === 'login') {
+        await signInWithEmail(email, password);
+      } else if (mode === 'signup') {
+        await signUpWithEmail(email, password);
+      } else if (mode === 'reset') {
+        await sendPasswordReset(email);
+        setError('Password reset email sent! Check your inbox.');
+        setLoading(false);
+        return;
+      }
+      router.push('/');
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      setError(err.message || 'An error occurred during authentication');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await signInWithGoogle();
+      router.push('/');
+    } catch (err: any) {
+      console.error('Google auth error:', err);
+      setError(err.message || 'An error occurred during Google sign-in');
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,7 +117,7 @@ export default function LoginPage() {
             {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
           </h1>
           <p className="text-sm text-[var(--theme-text-secondary)]">
-            {mode === 'login' ? 'This screen is reserved for future auth support' : mode === 'signup' ? 'Sign-up is disabled in this local-only build' : 'Password reset is disabled in this local-only build'}
+            {mode === 'login' ? 'Sign in to sync your habits across devices' : mode === 'signup' ? 'Start your journey with Kinetic today' : 'Enter your email to receive a reset link'}
           </p>
         </div>
         
@@ -164,23 +195,32 @@ export default function LoginPage() {
             ) : (
               <>
                 {mode === 'login' ? <LogIn className="w-4 h-4" /> : mode === 'signup' ? <UserPlus className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                {mode === 'login' ? 'Sign In (Disabled)' : mode === 'signup' ? 'Join Kinetic (Disabled)' : 'Send Reset Link (Disabled)'}
+                {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Join Kinetic' : 'Send Reset Link'}
               </>
             )}
           </motion.button>
         </form>
 
-        {mode === 'login' && (
-          <button
-            type="button"
-            onClick={() => {
-              router.push('/');
-            }}
-            className="w-full py-3 mt-4 rounded-2xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[var(--theme-foreground)]/5 transition-colors"
-          >
-            <User className="w-4 h-4" />
-            Continue to App
-          </button>
+        {mode !== 'reset' && (
+          <div className="mt-4">
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-[var(--theme-border)]"></div>
+              <span className="flex-shrink mx-4 text-xs text-[var(--theme-text-muted)] uppercase tracking-widest font-medium">Or continue with</span>
+              <div className="flex-grow border-t border-[var(--theme-border)]"></div>
+            </div>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full py-3 mt-4 rounded-2xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium text-sm flex items-center justify-center gap-2 hover:bg-[var(--theme-foreground)]/5 transition-colors disabled:opacity-50"
+            >
+              <Chrome className="w-4 h-4" />
+              Google Account
+            </motion.button>
+          </div>
         )}
 
         <div className="mt-8 pt-6 border-t border-[var(--theme-border)] text-center">

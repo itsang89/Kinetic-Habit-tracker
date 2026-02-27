@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Clock, Brain } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';

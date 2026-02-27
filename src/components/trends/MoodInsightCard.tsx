@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Sparkles, TrendingUp, TrendingDown, Brain, Expand, Smile, Frown, Meh } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import { useEffect, useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, ScatterChart, Scatter, ZAxis, ResponsiveContainer } from 'recharts';
 import TrendDetailModal from './TrendDetailModal';
@@ -25,7 +26,7 @@ export default function MoodInsightCard() {
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
+      const dateString = getLocalDateKey(date);
       const log = moodLogs.find(m => m.loggedAt.startsWith(dateString));
       const dayCompletions = habitLogs.filter(l => l.completedAt.startsWith(dateString)).length;
       
@@ -60,7 +61,7 @@ export default function MoodInsightCard() {
     for (let i = 13; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
+      const dateString = getLocalDateKey(date);
       const log = moodLogs.find(m => m.loggedAt.startsWith(dateString));
       
       last14Days.push({

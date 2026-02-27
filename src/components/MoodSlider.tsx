@@ -1,10 +1,12 @@
 'use client';
 
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Smile } from 'lucide-react';
-import { useKineticStore } from '@/store/useKineticStore';
-import { useState, useEffect } from 'react';
 
+import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import { useMounted } from '@/hooks/useMounted';
 
 const moodEmojis = ['💀', '😫', '😩', '☹️', '😐', '🙂', '😊', '😎', '🤩', '🚀'];
@@ -22,7 +24,7 @@ export default function MoodSlider({ date }: MoodSliderProps) {
 
   useEffect(() => {
     if (!mounted) return;
-    const targetDate = date || new Date().toISOString().split('T')[0] || '';
+    const targetDate = date || getLocalDateKey();
     const todaysMood = getMoodOnDate(targetDate);
     if (todaysMood !== null) {
       setMood(todaysMood);

@@ -166,7 +166,7 @@ Entities:
 - **Habit**: name, type, target, unit, schedule, streak, bestStreak, shield, category, icon, archived status.
 - **HabitLog**: habitId, value, completedAt.
 - **MoodLog**: score, loggedAt.
-- **MissReasonLog**: habitId, date, reason.
+- **SkipLog**: habitId, dateKey.
 
 Main actions:
 - CRUD on habits, logs, and mood entries.
@@ -238,8 +238,8 @@ Patterns:
 - **Guest mode decay**:
   - Daily decay only triggered for signed-in users (via initializeStore).
 
-- **Timezone inconsistencies**:
-  - Uses `toISOString()` and `startsWith` comparisons; may shift day boundaries in local time.
+- **Timezone consistency**:
+  - Uses local date keys (`YYYY-MM-DD`) via `getLocalDateKey()` to fix timezone drift.
 
 - **Inconsistent completion semantics**:
   - Calendar strip marks completion if any log exists (ignores partial).

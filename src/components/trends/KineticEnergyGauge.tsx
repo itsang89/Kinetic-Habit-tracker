@@ -1,25 +1,20 @@
 'use client';
 
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Zap, Expand, TrendingUp, TrendingDown, Minus, Target, Flame, Award } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
+import { getMomentumStatus, getMomentumLabel } from '@/lib/momentumUtils';
 import { useEffect, useState, useMemo } from 'react';
 import TrendDetailModal from './TrendDetailModal';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
 
-const getMotivationalMessage = (score: number): string => {
-  if (score >= 90) return "Unstoppable!";
-  if (score >= 75) return "Peak mode";
-  if (score >= 60) return "Momentum";
-  if (score >= 45) return "Building up";
-  if (score >= 30) return "Push harder";
-  return "Get moving";
-};
-
 import { useMounted } from '@/hooks/useMounted';
 
 export default function KineticEnergyGauge() {
-  const { momentumScore, getOverallStats, habitLogs, habits, previousWeekMomentum } = useKineticStore();
+  const { momentumScore, getOverallStats, habitLogs, habits, previousWeekMomentum, skipLogs } = useKineticStore();
   const mounted = useMounted();
   const [displayScore, setDisplayScore] = useState(50);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,22 +31,27 @@ export default function KineticEnergyGauge() {
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
-      const dayLogs = habitLogs.filter(l => l.completedAt.startsWith(dateString));
+      const dateString = getLocalDateKey(date);
+      const dayLogs = habitLogs.filter(l => !l.deletedAt && l.completedAt.startsWith(dateString));
       
-      // Simulate momentum calculation
-      const expectedHabits = habits.filter(h => !h.isArchived).length;
-      const completionRate = expectedHabits > 0 ? dayLogs.length / expectedHabits : 0;
+      const activeHabits = habits.filter(h => !h.deletedAt && !h.isArchived);
+      let dailyChange = -2; // Base decay
+
+      activeHabits.forEach(h => {
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === h.id && l.completedAt.startsWith(dateString));
+        const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === h.id && l.dateKey === dateString);
+        const status = getCompletionStatus(log, skipLog, h, dateString);
+
+        if (status === 'complete' || status === 'skipped') {
+          dailyChange += 10;
+        } else if (status === 'partial' && log) {
+          dailyChange += (log.value / h.target) * 10;
+        } else if (status === 'missed') {
+          dailyChange -= 5;
+        }
+      });
       
-      if (completionRate >= 0.8) {
-        runningScore = Math.min(100, runningScore + 3);
-      } else if (completionRate >= 0.5) {
-        runningScore = Math.min(100, runningScore + 1);
-      } else if (completionRate > 0) {
-        runningScore = Math.max(0, runningScore - 1);
-      } else {
-        runningScore = Math.max(0, runningScore - 3);
-      }
+      runningScore = Math.max(0, Math.min(100, runningScore + dailyChange));
       
       history.push({
         date: dateString,
@@ -186,12 +186,12 @@ export default function KineticEnergyGauge() {
         {/* Stats column */}
         <div className="flex-1 space-y-2">
           <motion.p
-            key={getMotivationalMessage(displayScore)}
+            key={getMomentumLabel(displayScore)}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-[var(--theme-text-primary)] font-semibold text-sm"
           >
-            {getMotivationalMessage(displayScore)}
+            {getMomentumLabel(displayScore)}
           </motion.p>
           
           <div className="grid grid-cols-3 gap-2">
@@ -255,7 +255,7 @@ export default function KineticEnergyGauge() {
                   {Math.round(displayScore)}
                 </text>
                 <text x={140} y={135} fill="var(--theme-text-secondary)" fontSize="14" textAnchor="middle">
-                  {getMotivationalMessage(displayScore)}
+                  {getMomentumLabel(displayScore)}
                 </text>
               </svg>
             </div>
@@ -359,18 +359,18 @@ export default function KineticEnergyGauge() {
             <p className="text-xs text-[var(--theme-text-secondary)] uppercase tracking-wider mb-4">Energy Level Guide</p>
             <div className="space-y-2">
               {[
-                { range: '90-100', label: 'Unstoppable!', desc: 'Peak performance mode' },
-                { range: '75-89', label: 'Peak Mode', desc: 'Excellent momentum' },
-                { range: '60-74', label: 'Momentum', desc: 'Building strong habits' },
-                { range: '45-59', label: 'Building Up', desc: 'Making progress' },
-                { range: '30-44', label: 'Push Harder', desc: 'Room for improvement' },
-                { range: '0-29', label: 'Get Moving', desc: 'Time to restart' },
+                { range: '90-100', status: getMomentumStatus(95) },
+                { range: '75-89', status: getMomentumStatus(80) },
+                { range: '60-74', status: getMomentumStatus(65) },
+                { range: '45-59', status: getMomentumStatus(50) },
+                { range: '30-44', status: getMomentumStatus(35) },
+                { range: '15-29', status: getMomentumStatus(20) },
+                { range: '0-14', status: getMomentumStatus(5) },
               ].map((level, i) => (
                 <div key={level.range} className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${i === 0 ? 'bg-[var(--theme-foreground)]' : i < 3 ? 'bg-[var(--theme-foreground)]/60' : 'bg-[var(--theme-foreground)]/30'}`} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: level.status.color }} />
                   <span className="text-xs text-[var(--theme-text-secondary)] w-16">{level.range}</span>
-                  <span className="text-sm text-[var(--theme-text-primary)]">{level.label}</span>
-                  <span className="text-xs text-[var(--theme-text-secondary)]">— {level.desc}</span>
+                  <span className="text-sm text-[var(--theme-text-primary)]">{level.status.label} {level.status.emoji}</span>
                 </div>
               ))}
             </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, ChevronRight, Bell, Archive, Trash2 } from 'lucide-react';
 import { Habit } from '@/store/useKineticStore';

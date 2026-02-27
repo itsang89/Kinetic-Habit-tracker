@@ -1,9 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import BottomNav from '@/components/BottomNav';
 import EditHabitModal from '@/components/habits/EditHabitModal';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -28,7 +30,7 @@ export default function HabitDetailPage() {
   const router = useRouter();
   
   const { 
-    habits, habitLogs, moodLogs, 
+    habits, habitLogs, moodLogs, skipLogs,
     getHabitHealth, archiveHabit, deleteHabit, 
     setGlobalModalOpen
   } = useKineticStore();
@@ -54,13 +56,13 @@ export default function HabitDetailPage() {
   // Calculations
   const habitStats = useMemo(() => {
     if (!habit) return null;
-    return calculateHabitStats(habit, habitLogs);
-  }, [habit, habitLogs]);
+    return calculateHabitStats(habit, habitLogs, skipLogs);
+  }, [habit, habitLogs, skipLogs]);
 
   const calendarData = useMemo(() => {
     if (!habit) return [];
-    return generateCalendarData(habit, habitLogs, calendarMonth);
-  }, [habit, habitLogs, calendarMonth]);
+    return generateCalendarData(habit, habitLogs, skipLogs, calendarMonth);
+  }, [habit, habitLogs, skipLogs, calendarMonth]);
 
   const timeAnalysis = useMemo(() => {
     if (!habit) return [];
@@ -69,7 +71,7 @@ export default function HabitDetailPage() {
     for (let i = 0; i < 24; i++) hourCounts[i] = 0;
     
     habitLogs
-      .filter(l => l.habitId === habitId)
+      .filter(l => !l.deletedAt && l.habitId === habitId)
       .forEach(log => {
         const hour = new Date(log.completedAt).getHours();
         hourCounts[hour] = (hourCounts[hour] || 0) + 1;
@@ -97,11 +99,11 @@ export default function HabitDetailPage() {
     for (let i = 89; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
+      const dateString = getLocalDateKey(date);
       const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as any;
       
       if (habit.schedule.includes(dayOfWeek)) {
-        const completed = habitLogs.some(l => l.habitId === habitId && l.completedAt.startsWith(dateString));
+        const completed = habitLogs.some(l => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateString));
         if (completed) {
           runningScore = Math.min(100, runningScore + 3);
         } else {
@@ -121,12 +123,12 @@ export default function HabitDetailPage() {
     if (!habit) return [];
     
     return habitLogs
-      .filter(l => l.habitId === habitId)
+      .filter(l => !l.deletedAt && l.habitId === habitId)
       .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
       .slice(0, 50)
       .map(log => {
         const date = new Date(log.completedAt);
-        const moodLog = moodLogs.find(m => m.loggedAt.startsWith(log.completedAt.split('T')[0] || ''));
+        const moodLog = moodLogs.find(m => !m.deletedAt && m.loggedAt.startsWith(getLocalDateKey(new Date(log.completedAt))));
         return {
           id: log.id,
           formattedDate: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),

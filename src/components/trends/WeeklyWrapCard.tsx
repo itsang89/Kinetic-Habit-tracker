@@ -1,8 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import { CalendarDays, Star, TrendingUp, TrendingDown, Minus, Award, Expand, CheckCircle } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
 import { useEffect, useState, useMemo } from 'react';
 import TrendDetailModal from './TrendDetailModal';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
@@ -10,7 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { useMounted } from '@/hooks/useMounted';
 
 export default function WeeklyWrapCard() {
-  const { getWeeklySummary, updateWeeklyMomentum, habits, habitLogs, moodLogs, setWeeklyContractTarget } = useKineticStore();
+  const { getWeeklySummary, updateWeeklyMomentum, habits, habitLogs, moodLogs, skipLogs, setWeeklyContractTarget } = useKineticStore();
   const mounted = useMounted();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -27,7 +30,6 @@ export default function WeeklyWrapCard() {
     momentumChange: 0,
     avgMood: null,
     contract: { target: null, completed: 0, totalScheduled: 0, remaining: 0, isMet: false },
-    missReasons: [],
   };
 
   // Get weekly data for detailed view
@@ -38,15 +40,20 @@ export default function WeeklyWrapCard() {
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
-      const dayLogs = habitLogs.filter(l => l.completedAt.startsWith(dateString));
-      const moodLog = moodLogs.find(m => m.loggedAt.startsWith(dateString));
+      const dateString = getLocalDateKey(date);
+      const dayCompletions = habits.filter(h => !h.deletedAt).reduce((acc, h) => {
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === h.id && l.completedAt.startsWith(dateString));
+        const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === h.id && l.dateKey === dateString);
+        const status = getCompletionStatus(log, skipLog, h, dateString);
+        return (status === 'complete' || status === 'skipped') ? acc + 1 : acc;
+      }, 0);
+      const moodLog = moodLogs.find(m => !m.deletedAt && m.loggedAt.startsWith(dateString));
       
       days.push({
         date: dateString,
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
         fullDay: date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
-        completions: dayLogs.length,
+        completions: dayCompletions,
         mood: moodLog?.score || null,
       });
     }
@@ -60,13 +67,22 @@ export default function WeeklyWrapCard() {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     
-    return habits.filter(h => !h.isArchived).map(habit => {
-      const logs = habitLogs.filter(l => 
-        l.habitId === habit.id && new Date(l.completedAt) >= weekAgo
-      );
+    return habits.filter(h => !h.deletedAt && !h.isArchived).map(habit => {
+      let weeklyCompletions = 0;
+      for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateString = getLocalDateKey(date);
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString));
+        const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString);
+        const status = getCompletionStatus(log, skipLog, habit, dateString);
+        if (status === 'complete' || status === 'skipped') {
+          weeklyCompletions++;
+        }
+      }
       return {
         ...habit,
-        weeklyCompletions: logs.length,
+        weeklyCompletions,
       };
     }).sort((a, b) => b.weeklyCompletions - a.weeklyCompletions);
   }, [mounted, habits, habitLogs]);
@@ -374,8 +390,8 @@ export default function WeeklyWrapCard() {
             </div>
           </div>
 
-          {/* Contract + Miss Reasons Recap */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {/* Contract Recap */}
+          <div className="pt-2">
             <div className="p-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-foreground)]/5">
               <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider mb-2">Contract Recap</p>
               {summary.contract.target === null ? (
@@ -389,24 +405,6 @@ export default function WeeklyWrapCard() {
                     {summary.contract.isMet ? 'You met your contract this week.' : `${summary.contract.remaining} completions still needed.`}
                   </p>
                 </>
-              )}
-            </div>
-            <div className="p-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-foreground)]/5">
-              <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider mb-2">Miss Reasons</p>
-              {summary.missReasons.every((item) => item.count === 0) ? (
-                <p className="text-sm text-[var(--theme-text-secondary)]">No miss reasons logged this week.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {summary.missReasons
-                    .filter((item) => item.count > 0)
-                    .sort((a, b) => b.count - a.count)
-                    .map((item) => (
-                      <div key={item.reason} className="flex items-center justify-between text-sm">
-                        <span className="text-[var(--theme-text-secondary)]">{missReasonLabels[item.reason]}</span>
-                        <span className="font-semibold text-[var(--theme-text-primary)]">{item.count}</span>
-                      </div>
-                    ))}
-                </div>
               )}
             </div>
           </div>

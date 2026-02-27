@@ -3,12 +3,13 @@
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { 
   Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, 
-  Pencil, Code, Music, Leaf, Target, Zap, Star, Shield,
+  Pencil, Code, Music, Leaf, Target, Zap, Star,
   Edit3, Archive, ArchiveRestore, ChevronRight
 } from 'lucide-react';
 import { Habit, HabitIcon, useKineticStore } from '@/store/useKineticStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import React, { useState, useRef, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { HABIT_ICON_MAP } from '@/lib/habitIcons';

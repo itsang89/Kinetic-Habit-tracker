@@ -1,10 +1,12 @@
 'use client';
 
+import * as React from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Shield, Flame, Trash2 } from 'lucide-react';
-import { Habit, MissReason, useKineticStore } from '@/store/useKineticStore';
+import { Habit, useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import React, { useState, useEffect } from 'react';
 import KineticSlider from './habits/KineticSlider';
 import MultiTapCapacitor from './habits/MultiTapCapacitor';
 
@@ -19,19 +21,21 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
     logHabitCompletion,
     removeHabitCompletion,
     getHabitProgress,
-    useShield,
     deleteHabit,
     setGlobalModalOpen,
-    logMissReason,
-    getMissReasonForHabitDate,
+    logSkip,
+    removeSkip,
+    isHabitCompletedOnDate,
   } = useKineticStore();
-  const targetDate = date || new Date().toISOString().split('T')[0] || '';
-  const todayString = new Date().toISOString().split('T')[0] || '';
-  const isToday = targetDate === todayString;
+  const targetDateKey = date || getLocalDateKey();
+  const todayString = getLocalDateKey();
+  const isToday = targetDateKey === todayString;
   
-  const { current, percent } = getHabitProgress(habit.id, targetDate);
+  const { current, percent } = getHabitProgress(habit.id, targetDateKey);
   const isCompleted = percent >= 100;
-  const missReason = getMissReasonForHabitDate(habit.id, targetDate);
+  const isSkipped = useKineticStore(state => 
+    state.skipLogs.some(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === targetDateKey)
+  );
   
   const [showDelete, setShowDelete] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -44,20 +48,12 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
   }, [showDeleteConfirm, setGlobalModalOpen]);
 
   const handleToggleComplete = async () => {
-    // allow one tap completion for simple, duration, and count habits
     if (habit.type !== 'simple' && habit.type !== 'duration' && habit.type !== 'count') return;
 
     if (isCompleted) {
-      await removeHabitCompletion(habit.id, date);
+      await removeHabitCompletion(habit.id, targetDateKey);
     } else {
-      await logHabitCompletion(habit.id, habit.target, date);
-    }
-  };
-
-  const handleShield = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (habit.shieldAvailable) {
-      await useShield(habit.id);
+      await logHabitCompletion(habit.id, habit.target, targetDateKey);
     }
   };
 
@@ -66,17 +62,20 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
   };
 
   const handleValueChange = async (newValue: number) => {
-      // If 0, maybe remove completion?
       if (newValue === 0) {
-          await removeHabitCompletion(habit.id, date);
+          await removeHabitCompletion(habit.id, targetDateKey);
       } else {
-          await logHabitCompletion(habit.id, newValue, date);
+          await logHabitCompletion(habit.id, newValue, targetDateKey);
       }
   };
 
-  const handleMissReason = async (reason: MissReason, e: React.MouseEvent) => {
+  const handleToggleSkip = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await logMissReason(habit.id, reason, targetDate);
+    if (isSkipped) {
+      await removeSkip(habit.id, targetDateKey);
+    } else {
+      await logSkip(habit.id, targetDateKey);
+    }
   };
 
   return (
@@ -152,23 +151,6 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
             </div>
           )}
 
-          {/* Shield button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={handleShield}
-            disabled={!habit.shieldAvailable}
-            className={`
-              w-8 h-8 rounded-full flex items-center justify-center transition-all
-              ${habit.shieldAvailable 
-                ? 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--brand-main)]/15' 
-                : 'text-[var(--theme-text-muted)] cursor-not-allowed'
-              }
-            `}
-          >
-            <Shield className="w-4 h-4" />
-          </motion.button>
-
           {/* Delete button */}
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
@@ -211,29 +193,23 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
 
       {!isCompleted && isToday && (
         <div
-          className="mt-4 pt-4 border-t border-[var(--theme-border)] flex items-center gap-2 flex-wrap"
+          className="mt-4 pt-4 border-t border-[var(--theme-border)] flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="text-[10px] uppercase tracking-wider text-[var(--theme-text-secondary)]">Miss reason</span>
-          {([
-            { key: 'busy', label: 'Busy' },
-            { key: 'low_energy', label: 'Low energy' },
-            { key: 'forgot', label: 'Forgot' },
-          ] as const).map((option) => (
-            <button
-              key={option.key}
-              onClick={(e) => handleMissReason(option.key, e)}
-              className={`
-                px-2.5 py-1 rounded-full border text-[10px] font-medium transition-colors
-                ${missReason === option.key
-                  ? 'bg-[var(--theme-foreground)]/15 border-[var(--theme-foreground)]/30 text-[var(--theme-text-primary)]'
-                  : 'bg-[var(--theme-foreground)]/5 border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
-                }
-              `}
-            >
-              {option.label}
-            </button>
-          ))}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleToggleSkip}
+            className={`
+              px-4 py-1.5 rounded-full border text-xs font-medium transition-all
+              ${isSkipped
+                ? 'bg-[var(--theme-foreground)]/15 border-[var(--theme-foreground)]/30 text-[var(--theme-text-primary)] shadow-inner'
+                : 'bg-[var(--theme-foreground)]/5 border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/10'
+              }
+            `}
+          >
+            {isSkipped ? 'Skipped' : 'Skip Habit'}
+          </motion.button>
         </div>
       )}
       
@@ -258,4 +234,4 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
   );
 }
 
-export default React.memo(HabitCardComponent);
+export default memo(HabitCardComponent);

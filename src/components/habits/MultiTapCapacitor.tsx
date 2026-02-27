@@ -1,8 +1,9 @@
 'use client';
 
+import * as React from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus, Check } from 'lucide-react';
-import { useState } from 'react';
 
 interface MultiTapCapacitorProps {
   value: number;

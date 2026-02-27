@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { 
   Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, 
   Pencil, Code, Music, Leaf, Target, Zap, Star, Shield 

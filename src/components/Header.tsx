@@ -1,8 +1,9 @@
 'use client';
 
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 export default function Header() {
   const [dateString, setDateString] = useState('');

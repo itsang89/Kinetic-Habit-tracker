@@ -1,8 +1,10 @@
+import * as React from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
 import { ToastProvider } from '@/components/ToastProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
   title: "Kinetic - Habit & Mood Tracker",
@@ -16,13 +18,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         <ErrorBoundary>
-          <ThemeProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </ThemeProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </ThemeProvider>
+          </AuthProvider>
         </ErrorBoundary>
       </body>
     </html>

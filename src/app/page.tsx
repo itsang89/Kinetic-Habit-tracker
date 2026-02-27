@@ -1,5 +1,7 @@
 'use client';
 
+import * as React from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Header from '@/components/Header';
 import CompactStats from '@/components/CompactStats';
@@ -10,11 +12,11 @@ import StreakRescueCard from '@/components/StreakRescueCard';
 import DemoDataLoader from '@/components/DemoDataLoader';
 import BottomNav from '@/components/BottomNav';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { useState } from 'react';
+import { getLocalDateKey } from '@/lib/dateUtils';
 
 export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const dateString = selectedDate.toISOString().split('T')[0] || '';
+  const dateString = getLocalDateKey(selectedDate);
 
   return (
     <ProtectedRoute>

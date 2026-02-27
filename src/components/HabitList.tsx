@@ -1,11 +1,13 @@
 'use client';
 
+import * as React from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, ListChecks } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { ListTodo, Plus } from 'lucide-react';
 import { useKineticStore, DayOfWeek, Habit } from '@/store/useKineticStore';
+import { getLocalDateKey, formatDisplayDate } from '@/lib/dateUtils';
 import HabitCard from './HabitCard';
 
 import { useMounted } from '@/hooks/useMounted';
@@ -32,7 +34,7 @@ export default function HabitList({ date }: HabitListProps) {
   // This prevents habits from jumping around while the user is interacting with them
   useEffect(() => {
     if (mounted) {
-      const targetDate = date || new Date().toISOString().split('T')[0] || '';
+      const targetDate = date || getLocalDateKey();
       const map: Record<string, boolean> = {};
       activeHabits.forEach(h => {
         map[h.id] = isHabitCompletedOnDate(h.id, targetDate);
@@ -57,7 +59,7 @@ export default function HabitList({ date }: HabitListProps) {
       .sort((a, b) => {
           // Use the initial completion status for sorting to keep items in place
           // They will only "sink" to the bottom the next time the page is loaded/opened
-          const defaultDate = new Date().toISOString().split('T')[0] || '';
+          const defaultDate = getLocalDateKey();
           const aCompleted = initialCompletionMap[a.id] ?? isHabitCompletedOnDate(a.id, date || defaultDate);
           const bCompleted = initialCompletionMap[b.id] ?? isHabitCompletedOnDate(b.id, date || defaultDate);
           
@@ -71,7 +73,7 @@ export default function HabitList({ date }: HabitListProps) {
     return activeHabits.filter((h) => !h.schedule.includes(todayDay));
   }, [mounted, activeHabits, todayDay]);
 
-  const todayStr = new Date().toISOString().split('T')[0] || '';
+  const todayStr = getLocalDateKey();
   const isToday = !date || date === todayStr;
   const isFuture = date ? date > todayStr : false;
   
@@ -92,11 +94,11 @@ export default function HabitList({ date }: HabitListProps) {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-full bg-[var(--theme-foreground)]/5 flex items-center justify-center border border-[var(--theme-border)]">
-                <ListChecks className="w-5 h-5 text-[var(--theme-text-primary)]" />
+                <ListTodo className="w-5 h-5 text-[var(--theme-text-primary)]" />
              </div>
             <div>
-               <h2 className="text-xl font-bold text-[var(--theme-text-primary)]">
-                 {isToday ? "Today's Habits" : isFuture ? `Upcoming Habits: ${displayDate}` : `Habits for ${displayDate}`}
+               <h2 className="text-xl font-bold text-[var(--theme-text-primary)]" suppressHydrationWarning>
+                 {isFuture ? `Upcoming Habits: ${formatDisplayDate(date || '')}` : formatDisplayDate(date || getLocalDateKey())}
                </h2>
                <p className="text-xs text-[var(--theme-text-secondary)] uppercase tracking-widest mt-1">
                  {isToday ? 'Stay Consistent' : isFuture ? 'Plan Ahead' : 'Past Performance'}
@@ -144,7 +146,7 @@ export default function HabitList({ date }: HabitListProps) {
             )}
 
             {/* Other habits - Only show on current day */}
-            {(!date || date === new Date().toISOString().split('T')[0]) && otherHabits.length > 0 && (
+            {(!date || date === getLocalDateKey()) && otherHabits.length > 0 && (
               <div className="pt-8">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="h-px flex-1 bg-[var(--theme-border)]" />

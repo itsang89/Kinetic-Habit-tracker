@@ -1,7 +1,31 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { auth, db } from '@/lib/firebase';
+import { 
+  getAllUserData, 
+  updateProfile, 
+  batchUpsert,
+  UserProfile 
+} from '@/lib/firestore';
 
 import { MOMENTUM_CONSTANTS } from '@/lib/constants';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
+import { calculateMomentumChange } from '@/lib/momentumUtils';
+
+// Simple debounce helper
+const debounce = (fn: Function, ms = 2000) => {
+  let timeoutId: any;
+  return (...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(null, args), ms);
+  };
+};
+
+// Define outside to persist across store updates
+const debouncedSyncFn = debounce(async (get: any) => {
+  await get().syncToFirestore();
+}, 2000);
 
 export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 
@@ -20,8 +44,8 @@ export interface Habit {
   schedule: DayOfWeek[];
   streak: number;
   bestStreak: number;
-  shieldAvailable: boolean;
   createdAt: string;
+  deletedAt?: string;
   category: HabitCategory;
   icon: HabitIcon;
   isArchived: boolean;
@@ -32,22 +56,22 @@ export interface HabitLog {
   habitId: string;
   completedAt: string;
   value: number;
+  deletedAt?: string;
 }
 
 export interface MoodLog {
   id: string;
   score: number;
   loggedAt: string;
+  deletedAt?: string;
 }
 
-export type MissReason = 'busy' | 'low_energy' | 'forgot';
-
-export interface MissReasonLog {
+export interface SkipLog {
   id: string;
   habitId: string;
-  date: string; // YYYY-MM-DD
-  reason: MissReason;
+  dateKey: string; // YYYY-MM-DD
   createdAt: string;
+  deletedAt?: string;
 }
 
 export interface WeeklyContractStatus {
@@ -65,7 +89,6 @@ export interface WeeklySummary {
   momentumChange: number;
   avgMood: number | null;
   contract: WeeklyContractStatus;
-  missReasons: { reason: MissReason; count: number }[];
 }
 
 export type Theme = 'light' | 'dark';
@@ -77,8 +100,9 @@ interface KineticState {
   habits: Habit[];
   habitLogs: HabitLog[];
   moodLogs: MoodLog[];
-  missReasonLogs: MissReasonLog[];
+  skipLogs: SkipLog[];
   weeklyContractTarget: number | null;
+  selectedDate: string; // YYYY-MM-DD
   
   // Computed
   momentumScore: number;
@@ -91,7 +115,7 @@ interface KineticState {
   syncError: string | null;
   
   // Actions
-  addHabit: (habit: Omit<Habit, 'id' | 'streak' | 'bestStreak' | 'shieldAvailable' | 'createdAt' | 'isArchived' | 'category' | 'icon' | 'type'> & Partial<Pick<Habit, 'category' | 'icon' | 'type'>>) => Promise<void>;
+  addHabit: (habit: Omit<Habit, 'id' | 'streak' | 'bestStreak' | 'createdAt' | 'isArchived' | 'category' | 'icon' | 'type' | 'deletedAt'> & Partial<Pick<Habit, 'category' | 'icon' | 'type'>>) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
   updateHabit: (habitId: string, updates: Partial<Habit>) => Promise<void>;
   updateUserProfile: (name: string, icon: HabitIcon) => Promise<void>;
@@ -102,32 +126,30 @@ interface KineticState {
   bulkUnarchive: (habitIds: string[]) => Promise<void>;
   bulkDelete: (habitIds: string[]) => Promise<void>;
   bulkChangeCategory: (habitIds: string[], category: HabitCategory) => Promise<void>;
-  logHabitCompletion: (habitId: string, value?: number, date?: string) => Promise<void>;
-  removeHabitCompletion: (habitId: string, date?: string) => Promise<void>;
-  useShield: (habitId: string) => Promise<void>;
-  logMood: (score: number, date?: string) => Promise<void>;
-  logMissReason: (habitId: string, reason: MissReason, date?: string) => Promise<void>;
-  clearMissReason: (habitId: string, date?: string) => Promise<void>;
+  logHabitCompletion: (habitId: string, value?: number, dateKey?: string) => Promise<void>;
+  removeHabitCompletion: (habitId: string, dateKey?: string) => Promise<void>;
+  logMood: (score: number, dateKey?: string) => Promise<void>;
+  logSkip: (habitId: string, dateKey: string) => Promise<void>;
+  removeSkip: (habitId: string, dateKey: string) => Promise<void>;
   setWeeklyContractTarget: (target: number | null) => void;
+  setSelectedDate: (dateKey: string) => void;
   
   // Cloud sync actions
-  syncToCloud: () => Promise<void>;
-  fetchFromCloud: () => Promise<void>;
+  syncToFirestore: () => Promise<void>;
+  fetchFromCloud: (forcePushIfEmpty?: boolean) => Promise<void>;
   initializeStore: () => Promise<void>;
 
   calculateMomentumScore: () => number;
   applyDailyDecay: () => void;
-  getHabitProgress: (habitId: string, date: string) => { current: number; target: number; percent: number };
+  getHabitProgress: (habitId: string, dateKey: string) => { current: number; target: number; percent: number };
   getTodaysMood: () => number | null;
-  getMoodOnDate: (date: string) => number | null;
+  getMoodOnDate: (dateKey: string) => number | null;
   isHabitCompletedToday: (habitId: string) => boolean;
-  isHabitCompletedOnDate: (habitId: string, date: string) => boolean;
-  getHabitLogsForDate: (habitId: string, date: string) => HabitLog[];
+  isHabitCompletedOnDate: (habitId: string, dateKey: string) => boolean;
+  getHabitLogsForDate: (habitId: string, dateKey: string) => HabitLog[];
   getWeeklyHabitData: (habitId: string) => { date: string; completed: boolean }[];
   getYearlyHabitData: (habitId: string) => { date: string; count: number }[];
   getMoodCorrelationData: () => { date: string; mood: number; completionRate: number }[];
-  getMissReasonForHabitDate: (habitId: string, date: string) => MissReason | null;
-  getWeeklyMissReasonStats: () => { reason: MissReason; count: number }[];
   getWeeklyContractStatus: () => WeeklyContractStatus;
   
   // New Trends selectors
@@ -150,7 +172,7 @@ interface KineticState {
   setTheme: (theme: Theme) => void;
 
   // Data export helpers
-  getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[]; missReasonLogs: MissReasonLog[]; weeklyContractTarget: number | null };
+  getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[]; skipLogs: SkipLog[]; weeklyContractTarget: number | null };
   clearAllData: () => void;
   getJoinDate: () => string;
   updateWeeklyMomentum: () => void;
@@ -164,7 +186,7 @@ const generateId = () => {
 };
 
 const getDateString = (date: Date = new Date()) => {
-  return date.toISOString().split('T')[0] ?? '';
+  return getLocalDateKey(date);
 };
 
 const getDayOfWeek = (date: Date = new Date()): DayOfWeek => {
@@ -173,12 +195,18 @@ const getDayOfWeek = (date: Date = new Date()): DayOfWeek => {
 };
 
 // Helper function to recalculate streak and best streak for a habit
-const recalculateStreak = (habit: Habit, habitLogs: HabitLog[], upToDate?: string): { streak: number; bestStreak: number } => {
+const recalculateStreak = (habit: Habit, habitLogs: HabitLog[], skipLogs: SkipLog[], upToDate?: string): { streak: number; bestStreak: number } => {
   const today = new Date();
-  const endDate = upToDate ? new Date(upToDate + 'T23:59:59') : today;
+  const endDate = upToDate ? new Date(upToDate.includes('T') ? upToDate : upToDate + 'T23:59:59') : today;
   endDate.setHours(23, 59, 59, 999);
   
-  const habitCreatedAt = new Date(habit.createdAt);
+  const parseDate = (dStr: string) => {
+    if (dStr.includes('T')) return new Date(dStr);
+    const [y, m, d] = dStr.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
+  const habitCreatedAt = parseDate(habit.createdAt);
   habitCreatedAt.setHours(0, 0, 0, 0);
   
   let currentStreak = 0;
@@ -190,82 +218,79 @@ const recalculateStreak = (habit: Habit, habitLogs: HabitLog[], upToDate?: strin
   const checkDate = new Date(startDate);
   
   while (checkDate <= endDate) {
-    const dateString = getDateString(checkDate);
-    const dayOfWeek = getDayOfWeek(checkDate);
+    const dateString = getLocalDateKey(checkDate);
     
-    // Only check days when habit is scheduled
-    if (habit.schedule.includes(dayOfWeek)) {
-      const log = habitLogs.find(
-        (l) => l.habitId === habit.id && l.completedAt.startsWith(dateString)
-      );
-      
-      const isCompleted = log ? (log.value / habit.target) >= 1 : false;
-      
-      if (isCompleted) {
+    const log = habitLogs.find(
+      (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString)
+    );
+    const skipLog = skipLogs.find(
+      (l) => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString
+    );
+    
+    const status = getCompletionStatus(log, skipLog, habit, dateString);
+    
+    if (status === 'complete' || status === 'skipped') {
+      if (status === 'complete') {
         tempStreak++;
-        maxStreak = Math.max(maxStreak, tempStreak);
-        
-        // Current streak is the streak ending at the end date
-        if (dateString === getDateString(endDate) || (upToDate && dateString === upToDate)) {
-          currentStreak = tempStreak;
-        }
-      } else {
-        // If this is before the end date, reset temp streak
-        if (checkDate < endDate) {
-          tempStreak = 0;
-        } else {
-          // If we're at the end date and it's not completed, current streak is 0
-          currentStreak = 0;
-        }
       }
+      maxStreak = Math.max(maxStreak, tempStreak);
+      
+      // Current streak is the streak ending at the end date
+      if (dateString === getLocalDateKey(endDate) || (upToDate && dateString === upToDate)) {
+        currentStreak = tempStreak;
+      }
+    } else if (status === 'partial' || status === 'missed') {
+      tempStreak = 0;
+      currentStreak = 0;
     }
     
     checkDate.setDate(checkDate.getDate() + 1);
   }
   
-  // If we didn't find a current streak (end date wasn't a scheduled day), 
-  // calculate from the most recent scheduled day
   if (currentStreak === 0 && !upToDate) {
     const recentDate = new Date(endDate);
     recentDate.setDate(recentDate.getDate() - 7); // Look back 7 days
     
     while (recentDate <= endDate) {
-      const dateString = getDateString(recentDate);
-      const dayOfWeek = getDayOfWeek(recentDate);
+      const dateString = getLocalDateKey(recentDate);
       
-      if (habit.schedule.includes(dayOfWeek)) {
-        const log = habitLogs.find(
-          (l) => l.habitId === habit.id && l.completedAt.startsWith(dateString)
-        );
+      const log = habitLogs.find(
+        (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString)
+      );
+      const skipLog = skipLogs.find(
+        (l) => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString
+      );
+      
+      const status = getCompletionStatus(log, skipLog, habit, dateString);
+      
+      if ((status === 'complete' || status === 'skipped') && tempStreak > 0) {
+        let streakCount = 0;
+        let checkBackDate = new Date(recentDate);
         
-        if (log && (log.value / habit.target) >= 1) {
-          // Count backwards to find current streak
-          let streakCount = 0;
-          let checkBackDate = new Date(recentDate);
+        while (checkBackDate >= habitCreatedAt) {
+          const backDateString = getLocalDateKey(checkBackDate);
           
-          while (checkBackDate >= habitCreatedAt) {
-            const backDateString = getDateString(checkBackDate);
-            const backDayOfWeek = getDayOfWeek(checkBackDate);
-            
-            if (habit.schedule.includes(backDayOfWeek)) {
-              const backLog = habitLogs.find(
-                (l) => l.habitId === habit.id && l.completedAt.startsWith(backDateString)
-              );
-              
-              if (backLog && (backLog.value / habit.target) >= 1) {
-                streakCount++;
-                checkBackDate.setDate(checkBackDate.getDate() - 1);
-              } else {
-                break;
-              }
-            } else {
-              checkBackDate.setDate(checkBackDate.getDate() - 1);
-            }
+          const bLog = habitLogs.find(
+            (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(backDateString)
+          );
+          const bSkipLog = skipLogs.find(
+            (l) => !l.deletedAt && l.habitId === habit.id && l.dateKey === backDateString
+          );
+          
+          const bStatus = getCompletionStatus(bLog, bSkipLog, habit, backDateString);
+          
+          if (bStatus === 'complete') {
+            streakCount++;
+            checkBackDate.setDate(checkBackDate.getDate() - 1);
+          } else if (bStatus === 'skipped' || bStatus === 'not-scheduled') {
+            checkBackDate.setDate(checkBackDate.getDate() - 1);
+          } else {
+            break;
           }
-          
-          currentStreak = streakCount;
-          break;
         }
+        
+        currentStreak = streakCount;
+        break;
       }
       
       recentDate.setDate(recentDate.getDate() + 1);
@@ -286,8 +311,9 @@ export const useKineticStore = create<KineticState>()(
       habits: [],
       habitLogs: [],
       moodLogs: [],
-      missReasonLogs: [],
+      skipLogs: [],
       weeklyContractTarget: null,
+      selectedDate: getLocalDateKey(),
       momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
       lastDecayDate: null,
       previousWeekMomentum: MOMENTUM_CONSTANTS.INITIAL_SCORE,
@@ -301,24 +327,24 @@ export const useKineticStore = create<KineticState>()(
           id: generateId(),
           streak: 0,
           bestStreak: 0,
-          shieldAvailable: true,
-          createdAt: new Date().toISOString(),
+          createdAt: getLocalDateKey(),
           category: habitData.category || 'other',
           icon: habitData.icon || 'star',
           type: habitData.type || 'simple',
           isArchived: false,
         };
         set((state) => ({ habits: [...state.habits, newHabit] }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       deleteHabit: async (habitId) => {
+        const now = new Date().toISOString();
         set((state) => ({
-          habits: state.habits.filter((h) => h.id !== habitId),
-          habitLogs: state.habitLogs.filter((l) => l.habitId !== habitId),
-          missReasonLogs: state.missReasonLogs.filter((l) => l.habitId !== habitId),
+          habits: state.habits.map((h) => h.id === habitId ? { ...h, deletedAt: now } : h),
+          habitLogs: state.habitLogs.map((l) => l.habitId === habitId ? { ...l, deletedAt: now } : l),
+          skipLogs: state.skipLogs.map((l) => l.habitId === habitId ? { ...l, deletedAt: now } : l),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       updateHabit: async (habitId, updates) => {
@@ -327,12 +353,12 @@ export const useKineticStore = create<KineticState>()(
             h.id === habitId ? { ...h, ...updates } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       updateUserProfile: async (userName, userIcon) => {
         set({ userName, userIcon });
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       archiveHabit: async (habitId) => {
@@ -341,7 +367,7 @@ export const useKineticStore = create<KineticState>()(
             h.id === habitId ? { ...h, isArchived: true } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       unarchiveHabit: async (habitId) => {
@@ -350,18 +376,19 @@ export const useKineticStore = create<KineticState>()(
             h.id === habitId ? { ...h, isArchived: false } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       resetHabitStats: async (habitId) => {
+        const now = new Date().toISOString();
         set((state) => ({
           habits: state.habits.map((h) =>
             h.id === habitId ? { ...h, streak: 0, bestStreak: 0 } : h
           ),
-          habitLogs: state.habitLogs.filter((l) => l.habitId !== habitId),
-          missReasonLogs: state.missReasonLogs.filter((l) => l.habitId !== habitId),
+          habitLogs: state.habitLogs.map((l) => l.habitId === habitId ? { ...l, deletedAt: now } : l),
+          skipLogs: state.skipLogs.map((l) => l.habitId === habitId ? { ...l, deletedAt: now } : l),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       bulkArchive: async (habitIds) => {
@@ -370,7 +397,7 @@ export const useKineticStore = create<KineticState>()(
             habitIds.includes(h.id) ? { ...h, isArchived: true } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       bulkUnarchive: async (habitIds) => {
@@ -379,16 +406,17 @@ export const useKineticStore = create<KineticState>()(
             habitIds.includes(h.id) ? { ...h, isArchived: false } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       bulkDelete: async (habitIds) => {
+        const now = new Date().toISOString();
         set((state) => ({
-          habits: state.habits.filter((h) => !habitIds.includes(h.id)),
-          habitLogs: state.habitLogs.filter((l) => !habitIds.includes(l.habitId)),
-          missReasonLogs: state.missReasonLogs.filter((l) => !habitIds.includes(l.habitId)),
+          habits: state.habits.map((h) => habitIds.includes(h.id) ? { ...h, deletedAt: now } : h),
+          habitLogs: state.habitLogs.map((l) => habitIds.includes(l.habitId) ? { ...l, deletedAt: now } : l),
+          skipLogs: state.skipLogs.map((l) => habitIds.includes(l.habitId) ? { ...l, deletedAt: now } : l),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
       bulkChangeCategory: async (habitIds, category) => {
@@ -397,18 +425,18 @@ export const useKineticStore = create<KineticState>()(
             habitIds.includes(h.id) ? { ...h, category } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
-      logHabitCompletion: async (habitId, value = 1, date) => {
+      logHabitCompletion: async (habitId, value = 1, dateKey) => {
         const state = get();
-        const targetDate = date || getDateString();
+        const targetDateKey = dateKey || state.selectedDate;
         
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (!habit) return;
 
         const existingLogIndex = state.habitLogs.findIndex(
-          (log) => log.habitId === habitId && log.completedAt.startsWith(targetDate)
+          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
         );
         
         let logs = [...state.habitLogs];
@@ -417,63 +445,59 @@ export const useKineticStore = create<KineticState>()(
         const oldValue = existingLog ? existingLog.value : 0;
 
         if (existingLogIndex >= 0 && existingLog) {
-            // Update existing log
             logs[existingLogIndex] = { ...existingLog, value };
         } else {
-            // New log
             logs.push({
                 id: generateId(),
                 habitId,
-                completedAt: date ? `${date}T12:00:00.000Z` : new Date().toISOString(),
+                completedAt: dateKey ? `${dateKey}T12:00:00` : `${getLocalDateKey()}T${new Date().toLocaleTimeString('sv')}`,
                 value,
             });
         }
         
-        // Recalculate streak and best streak properly
-        // Use the updated logs array for calculation
         const updatedLogs = logs;
-        const streakData = recalculateStreak(habit, updatedLogs, targetDate);
+        const streakData = recalculateStreak(habit, updatedLogs, state.skipLogs, targetDateKey);
         const newStreak = streakData.streak;
         const newBestStreak = streakData.bestStreak;
 
-        // Momentum Logic: Proportional Credit
         const oldPercent = Math.min(1, oldValue / habit.target);
         const newPercent = Math.min(1, value / habit.target);
-        const deltaPercent = newPercent - oldPercent;
-        const momentumChange = deltaPercent * MOMENTUM_CONSTANTS.FULL_COMPLETION_BONUS;
+        const momentumChange = calculateMomentumChange(newPercent, false) - calculateMomentumChange(oldPercent, false);
 
         set((state) => ({
             habitLogs: logs,
-            missReasonLogs: state.missReasonLogs.filter(
-              (entry) => !(entry.habitId === habitId && entry.date === targetDate)
+            skipLogs: state.skipLogs.map((l) => 
+              (l.habitId === habitId && l.dateKey === targetDateKey) ? { ...l, deletedAt: new Date().toISOString() } : l
             ),
             habits: state.habits.map((h) =>
               h.id === habitId ? { ...h, streak: newStreak, bestStreak: newBestStreak } : h
             ),
             momentumScore: Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore + momentumChange)),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
-      removeHabitCompletion: async (habitId, date) => {
+      removeHabitCompletion: async (habitId, dateKey) => {
         const state = get();
-        const targetDate = date || getDateString();
+        const targetDateKey = dateKey || state.selectedDate;
         
-        const logToRemove = state.habitLogs.find(
-          (log) => log.habitId === habitId && log.completedAt.startsWith(targetDate)
+        const logToRemoveIndex = state.habitLogs.findIndex(
+          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
         );
         
-        if (!logToRemove) return;
+        if (logToRemoveIndex === -1) return;
 
-        const habit = state.habits.find((h) => h.id === habitId);
+        const logToRemove = state.habitLogs[logToRemoveIndex];
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (habit) {
-          // Remove the log first, then recalculate streaks
-          const updatedLogs = state.habitLogs.filter((l) => l.id !== logToRemove.id);
-          const streakData = recalculateStreak(habit, updatedLogs, targetDate);
+          const now = new Date().toISOString();
+          const updatedLogs = state.habitLogs.map((l, idx) => 
+            idx === logToRemoveIndex ? { ...l, deletedAt: now } : l
+          );
+          const streakData = recalculateStreak(habit, updatedLogs, state.skipLogs, targetDateKey);
           
-          // Remove proportional momentum
           const percentRemoved = Math.min(1, logToRemove.value / habit.target);
-          const momentumChange = percentRemoved * MOMENTUM_CONSTANTS.FULL_COMPLETION_BONUS;
+          const momentumChange = calculateMomentumChange(percentRemoved, false);
 
           set((state) => ({
             habitLogs: updatedLogs,
@@ -482,25 +506,16 @@ export const useKineticStore = create<KineticState>()(
             ),
             momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - momentumChange),
           }));
-          await get().syncToCloud();
+          debouncedSyncFn(get);
         }
       },
 
-      useShield: async (habitId) => {
-        set((state) => ({
-          habits: state.habits.map((h) =>
-            h.id === habitId ? { ...h, shieldAvailable: false } : h
-          ),
-        }));
-        await get().syncToCloud();
-      },
-
-      logMood: async (score, date) => {
-        const targetDate = date || getDateString();
+      logMood: async (score, dateKey) => {
+        const targetDateKey = dateKey || get().selectedDate;
         const state = get();
         
         const existingLog = state.moodLogs.find(
-          (log) => log.loggedAt.startsWith(targetDate)
+          (log) => !log.deletedAt && log.loggedAt.startsWith(targetDateKey)
         );
 
         if (existingLog) {
@@ -513,68 +528,161 @@ export const useKineticStore = create<KineticState>()(
           const newLog: MoodLog = {
             id: generateId(),
             score,
-            loggedAt: date ? `${date}T21:00:00.000Z` : new Date().toISOString(),
+            loggedAt: dateKey ? `${dateKey}T21:00:00` : `${getLocalDateKey()}T${new Date().toLocaleTimeString('sv')}`,
           };
           set((state) => ({ moodLogs: [...state.moodLogs, newLog] }));
         }
-        await get().syncToCloud();
+        debouncedSyncFn(get);
       },
 
-      logMissReason: async (habitId, reason, date) => {
-        const targetDate = date || getDateString();
+      logSkip: async (habitId, dateKey) => {
         const state = get();
+        const targetDateKey = dateKey || state.selectedDate;
+        const now = new Date().toISOString();
 
-        const existing = state.missReasonLogs.find(
-          (entry) => entry.habitId === habitId && entry.date === targetDate
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return;
+
+        const existingSkip = state.skipLogs.find(
+          (l) => !l.deletedAt && l.habitId === habitId && l.dateKey === targetDateKey
+        );
+        if (existingSkip) return;
+
+        const newSkip: SkipLog = {
+          id: generateId(),
+          habitId,
+          dateKey: targetDateKey,
+          createdAt: now,
+        };
+
+        const updatedHabitLogs = state.habitLogs.map((l) => 
+          (!l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(targetDateKey))
+          ? { ...l, deletedAt: now }
+          : l
         );
 
-        if (existing) {
-          set((current) => ({
-            missReasonLogs: current.missReasonLogs.map((entry) =>
-              entry.id === existing.id ? { ...entry, reason } : entry
-            ),
-          }));
-        } else {
-          const newEntry: MissReasonLog = {
-            id: generateId(),
-            habitId,
-            date: targetDate,
-            reason,
-            createdAt: new Date().toISOString(),
-          };
+        const streakData = recalculateStreak(habit, updatedHabitLogs, [...state.skipLogs, newSkip], targetDateKey);
 
-          set((current) => ({
-            missReasonLogs: [...current.missReasonLogs, newEntry],
-          }));
-        }
-
-        await get().syncToCloud();
-      },
-
-      clearMissReason: async (habitId, date) => {
-        const targetDate = date || getDateString();
         set((state) => ({
-          missReasonLogs: state.missReasonLogs.filter(
-            (entry) => !(entry.habitId === habitId && entry.date === targetDate)
+          skipLogs: [...state.skipLogs, newSkip],
+          habitLogs: updatedHabitLogs,
+          habits: state.habits.map((h) =>
+            h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
           ),
         }));
-        await get().syncToCloud();
+        debouncedSyncFn(get);
+      },
+
+      removeSkip: async (habitId, dateKey) => {
+        const state = get();
+        const targetDateKey = dateKey || state.selectedDate;
+        const now = new Date().toISOString();
+
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return;
+
+        const existingSkip = state.skipLogs.find(
+          (l) => !l.deletedAt && l.habitId === habitId && l.dateKey === targetDateKey
+        );
+        if (!existingSkip) return;
+
+        const updatedSkipLogs = state.skipLogs.map((l) => 
+          (l.id === existingSkip.id) ? { ...l, deletedAt: now } : l
+        );
+
+        const streakData = recalculateStreak(habit, state.habitLogs, updatedSkipLogs, targetDateKey);
+
+        set((state) => ({
+          skipLogs: updatedSkipLogs,
+          habits: state.habits.map((h) =>
+            h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
+          ),
+        }));
+        debouncedSyncFn(get);
       },
 
       setWeeklyContractTarget: (target) => {
         set({ weeklyContractTarget: target });
+        debouncedSyncFn(get);
       },
 
-      syncToCloud: async () => {
-        set({ isSyncing: false, syncError: null });
+      setSelectedDate: (selectedDate) => set({ selectedDate }),
+
+      syncToFirestore: async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        set({ isSyncing: true, syncError: null });
+        try {
+          const state = get();
+          
+          // 1. Sync profile document
+          await updateProfile(user.uid, {
+            userName: state.userName,
+            userIcon: state.userIcon,
+            weeklyContractTarget: state.weeklyContractTarget,
+            momentumScore: state.momentumScore,
+            lastDecayDate: state.lastDecayDate,
+            previousWeekMomentum: state.previousWeekMomentum,
+          });
+
+          // 2. Batch upsert collections (includes soft-deleted items)
+          await Promise.all([
+            batchUpsert(user.uid, 'habits', state.habits),
+            batchUpsert(user.uid, 'habit_logs', state.habitLogs),
+            batchUpsert(user.uid, 'mood_logs', state.moodLogs),
+            batchUpsert(user.uid, 'skip_logs', state.skipLogs),
+          ]);
+          
+          set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
+        } catch (error: any) {
+          console.error('Firestore sync error:', error);
+          set({ isSyncing: false, syncError: error.message });
+        }
       },
 
-      fetchFromCloud: async () => {
-        set({ isSyncing: false, syncError: null });
+      fetchFromCloud: async (forcePushIfEmpty = false) => {
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        set({ isSyncing: true, syncError: null });
+        try {
+          const data = await getAllUserData(user.uid);
+          
+          if (data.profile || data.habits.length > 0) {
+            set({
+              userName: data.profile?.userName ?? get().userName,
+              userIcon: data.profile?.userIcon ?? get().userIcon,
+              habits: data.habits.length > 0 ? data.habits : get().habits,
+              habitLogs: data.habitLogs.length > 0 ? data.habitLogs : get().habitLogs,
+              moodLogs: data.moodLogs.length > 0 ? data.moodLogs : get().moodLogs,
+              skipLogs: data.skipLogs.length > 0 ? data.skipLogs : get().skipLogs,
+              weeklyContractTarget: data.profile?.weeklyContractTarget ?? get().weeklyContractTarget,
+              momentumScore: data.profile?.momentumScore ?? get().momentumScore,
+              lastDecayDate: data.profile?.lastDecayDate ?? get().lastDecayDate,
+              previousWeekMomentum: data.profile?.previousWeekMomentum ?? get().previousWeekMomentum,
+              lastSyncedAt: data.profile?.lastSyncedAt ?? get().lastSyncedAt,
+              isSyncing: false,
+            });
+          } else if (forcePushIfEmpty && (get().habits.length > 0 || get().habitLogs.length > 0)) {
+            // If cloud is empty but local has data, push local to cloud
+            await get().syncToFirestore();
+          } else {
+            set({ isSyncing: false });
+          }
+        } catch (error: any) {
+          console.error('Firestore fetch error:', error);
+          set({ isSyncing: false, syncError: error.message });
+        }
       },
 
       initializeStore: async () => {
-        // Apply daily decay first to ensure data is up to date
+        // Hydrate from cloud if user is logged in
+        const user = auth.currentUser;
+        if (user) {
+          await get().fetchFromCloud(true);
+        }
+        // Apply daily decay
         get().applyDailyDecay();
       },
 
@@ -584,7 +692,7 @@ export const useKineticStore = create<KineticState>()(
         const dayOfWeek = getDayOfWeek(today);
         
         const todaysHabits = state.habits.filter((h) =>
-          h.schedule.includes(dayOfWeek)
+          !h.deletedAt && h.schedule.includes(dayOfWeek)
         );
 
         if (todaysHabits.length === 0) return state.momentumScore;
@@ -596,11 +704,17 @@ export const useKineticStore = create<KineticState>()(
         
         todaysHabits.forEach((h) => {
             const log = state.habitLogs.find(
-                (l) => l.habitId === h.id && l.completedAt.startsWith(todayString)
+                (l) => !l.deletedAt && l.habitId === h.id && l.completedAt.startsWith(todayString)
             );
-            if (log) {
-                const percent = Math.min(1, log.value / h.target);
-                totalWeightedCompletion += percent;
+            const skipLog = state.skipLogs.find(
+                (l) => !l.deletedAt && l.habitId === h.id && l.dateKey === todayString
+            );
+            const status = getCompletionStatus(log, skipLog, h, todayString);
+            
+            if (status === 'complete' || status === 'skipped') {
+                totalWeightedCompletion += 1;
+            } else if (status === 'partial' && log) {
+                totalWeightedCompletion += Math.min(1, log.value / h.target);
             }
         });
 
@@ -608,8 +722,9 @@ export const useKineticStore = create<KineticState>()(
         
         // Projection logic based on streaks
         let score = state.momentumScore;
-        const avgStreak = state.habits.reduce((sum, h) => sum + h.streak, 0) / 
-          (state.habits.length || 1);
+        const activeHabits = state.habits.filter(h => !h.deletedAt);
+        const avgStreak = activeHabits.reduce((sum, h) => sum + h.streak, 0) / 
+          (activeHabits.length || 1);
         
         score += Math.min(avgStreak * 2, 20);
 
@@ -628,54 +743,47 @@ export const useKineticStore = create<KineticState>()(
         const dayOfWeek = getDayOfWeek(yesterday);
 
         const missedHabits = state.habits.filter((habit) => {
-          if (!habit.schedule.includes(dayOfWeek)) return false;
-          
-          // If shield was used, don't count as missed
-          if (habit.shieldAvailable === false) {
-            // Shield was used - restore it for next time and don't count as missed
-            return false;
-          }
+          if (habit.deletedAt || !habit.schedule.includes(dayOfWeek)) return false;
           
           const log = state.habitLogs.find(
-            (log) => log.habitId === habit.id && log.completedAt.startsWith(yesterdayString)
+            (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(yesterdayString)
+          );
+          const skipLog = state.skipLogs.find(
+            (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === yesterdayString
           );
           
-          if (!log) return true; // Missed completely
-
-          // Partial completion sustain logic
-          const percent = (log.value / habit.target) * 100;
-          return percent < 50; // Missed if < 50%
+          const status = getCompletionStatus(log, skipLog, habit, yesterdayString);
+          return status === 'missed';
         });
 
-        const decayAmount = missedHabits.length * MOMENTUM_CONSTANTS.SCORE_INCREMENT;
+        const totalPenalty = missedHabits.reduce((sum, h) => {
+          return sum + Math.abs(calculateMomentumChange(0, true));
+        }, 0);
         
         const updatedHabits = state.habits.map((habit) => {
-          // If shield was used, restore it and don't reset streak
-          if (habit.shieldAvailable === false) {
-            return { ...habit, shieldAvailable: true };
-          }
-          
+          if (habit.deletedAt) return habit;
           if (missedHabits.find((m) => m.id === habit.id)) {
-             // Reset streak if missed (and < 50%)
             return { ...habit, streak: 0 };
           }
           return habit;
         });
 
         set({
-          momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - decayAmount - MOMENTUM_CONSTANTS.DAILY_DECAY),
+          momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - totalPenalty - MOMENTUM_CONSTANTS.DAILY_DECAY),
           habits: updatedHabits,
           lastDecayDate: today,
         });
+
+        debouncedSyncFn(get);
       },
 
-      getHabitProgress: (habitId, date) => {
+      getHabitProgress: (habitId, dateKey) => {
         const state = get();
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (!habit) return { current: 0, target: 1, percent: 0 };
         
         const log = state.habitLogs.find(
-          (l) => l.habitId === habitId && l.completedAt.startsWith(date)
+          (l) => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateKey)
         );
         
         const current = log ? log.value : 0;
@@ -688,15 +796,15 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const today = getDateString();
         const todayLog = state.moodLogs.find((log) =>
-          log.loggedAt.startsWith(today)
+          !log.deletedAt && log.loggedAt.startsWith(today)
         );
         return todayLog?.score ?? null;
       },
 
-      getMoodOnDate: (date) => {
+      getMoodOnDate: (dateKey) => {
         const state = get();
         const moodLog = state.moodLogs.find((log) =>
-          log.loggedAt.startsWith(date)
+          !log.deletedAt && log.loggedAt.startsWith(dateKey)
         );
         return moodLog?.score ?? null;
       },
@@ -704,43 +812,57 @@ export const useKineticStore = create<KineticState>()(
       isHabitCompletedToday: (habitId) => {
         const state = get();
         const today = getDateString();
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return false;
         const log = state.habitLogs.find(
-          (log) => log.habitId === habitId && log.completedAt.startsWith(today)
+          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(today)
         );
-        return log && habit ? (log.value / habit.target) >= 1 : false;
+        const skipLog = state.skipLogs.find(
+          (log) => !log.deletedAt && log.habitId === habitId && log.dateKey === today
+        );
+        const status = getCompletionStatus(log, skipLog, habit, today);
+        return status === 'complete' || status === 'skipped';
       },
 
-      isHabitCompletedOnDate: (habitId, date) => {
+      isHabitCompletedOnDate: (habitId, dateKey) => {
         const state = get();
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return false;
         const log = state.habitLogs.find(
-          (log) => log.habitId === habitId && log.completedAt.startsWith(date)
+          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(dateKey)
         );
-        return log && habit ? (log.value / habit.target) >= 1 : false;
+        const skipLog = state.skipLogs.find(
+          (log) => !log.deletedAt && log.habitId === habitId && log.dateKey === dateKey
+        );
+        const status = getCompletionStatus(log, skipLog, habit, dateKey);
+        return status === 'complete' || status === 'skipped';
       },
 
-      getHabitLogsForDate: (habitId, date) => {
+      getHabitLogsForDate: (habitId, dateKey) => {
         const state = get();
         return state.habitLogs.filter(
-          (log) => log.habitId === habitId && log.completedAt.startsWith(date)
+          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(dateKey)
         );
       },
 
       getWeeklyHabitData: (habitId) => {
         const state = get();
         const data: { date: string; completed: boolean }[] = [];
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return [];
         
         for (let i = 6; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           const dateString = getDateString(date);
           const log = state.habitLogs.find(
-            (log) => log.habitId === habitId && log.completedAt.startsWith(dateString)
+            (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(dateString)
           );
-          const completed = log && habit ? (log.value / habit.target) >= 1 : false;
-          data.push({ date: dateString, completed });
+          const skipLog = state.skipLogs.find(
+            (log) => !log.deletedAt && log.habitId === habitId && log.dateKey === dateString
+          );
+          const status = getCompletionStatus(log, skipLog, habit, dateString);
+          data.push({ date: dateString, completed: status === 'complete' || status === 'skipped' });
         }
         return data;
       },
@@ -748,13 +870,22 @@ export const useKineticStore = create<KineticState>()(
       getYearlyHabitData: (habitId) => {
         const state = get();
         const data: { date: string; count: number }[] = [];
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+        if (!habit) return [];
+
         for (let i = 364; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           const dateString = getDateString(date);
-          const count = state.habitLogs.filter(
-            (log) => log.habitId === habitId && log.completedAt.startsWith(dateString)
-          ).length;
+          const log = state.habitLogs.find(
+            (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(dateString)
+          );
+          const skipLog = state.skipLogs.find(
+            (log) => !log.deletedAt && log.habitId === habitId && log.dateKey === dateString
+          );
+          const status = getCompletionStatus(log, skipLog, habit, dateString);
+          
+          const count = (status === 'complete' || status === 'skipped') ? 1 : (status === 'partial' ? 0.5 : 0);
           data.push({ date: dateString, count });
         }
         return data;
@@ -771,11 +902,11 @@ export const useKineticStore = create<KineticState>()(
           const dayOfWeek = getDayOfWeek(date);
           
           const moodLog = state.moodLogs.find((log) =>
-            log.loggedAt.startsWith(dateString)
+            !log.deletedAt && log.loggedAt.startsWith(dateString)
           );
           
           const scheduledHabits = state.habits.filter((h) =>
-            h.schedule.includes(dayOfWeek)
+            !h.deletedAt && h.schedule.includes(dayOfWeek)
           );
           
           if (scheduledHabits.length > 0) {
@@ -783,9 +914,16 @@ export const useKineticStore = create<KineticState>()(
             
             scheduledHabits.forEach(h => {
                 const log = state.habitLogs.find(
-                    (l) => l.habitId === h.id && l.completedAt.startsWith(dateString)
+                    (l) => !l.deletedAt && l.habitId === h.id && l.completedAt.startsWith(dateString)
                 );
-                if (log) {
+                const skipLog = state.skipLogs.find(
+                    (l) => !l.deletedAt && l.habitId === h.id && l.dateKey === dateString
+                );
+                const status = getCompletionStatus(log, skipLog, h, dateString);
+                
+                if (status === 'complete' || status === 'skipped') {
+                    totalWeightedCompletion += 1;
+                } else if (status === 'partial' && log) {
                     totalWeightedCompletion += Math.min(1, log.value / h.target);
                 }
             });
@@ -803,42 +941,6 @@ export const useKineticStore = create<KineticState>()(
         }
         
         return data;
-      },
-
-      getMissReasonForHabitDate: (habitId, date) => {
-        const state = get();
-        const entry = state.missReasonLogs.find(
-          (item) => item.habitId === habitId && item.date === date
-        );
-        return entry?.reason ?? null;
-      },
-
-      getWeeklyMissReasonStats: () => {
-        const state = get();
-        const today = new Date();
-        const day = today.getDay();
-        const diff = day === 0 ? -6 : 1 - day;
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() + diff);
-        weekStart.setHours(0, 0, 0, 0);
-
-        const counts: Record<MissReason, number> = {
-          busy: 0,
-          low_energy: 0,
-          forgot: 0,
-        };
-
-        state.missReasonLogs.forEach((entry) => {
-          const entryDate = new Date(`${entry.date}T00:00:00`);
-          if (entryDate >= weekStart && entryDate <= today) {
-            counts[entry.reason] += 1;
-          }
-        });
-
-        return (Object.keys(counts) as MissReason[]).map((reason) => ({
-          reason,
-          count: counts[reason],
-        }));
       },
 
       getWeeklyContractStatus: () => {
@@ -859,7 +961,7 @@ export const useKineticStore = create<KineticState>()(
         let totalScheduled = 0;
         let completed = 0;
 
-        const activeHabits = state.habits.filter((habit) => !habit.isArchived);
+        const activeHabits = state.habits.filter((habit) => !habit.deletedAt && !habit.isArchived);
 
         for (let i = 0; i < 7; i++) {
           const date = new Date(weekStart);
@@ -876,10 +978,14 @@ export const useKineticStore = create<KineticState>()(
             totalScheduled += 1;
 
             const log = state.habitLogs.find(
-              (entry) => entry.habitId === habit.id && entry.completedAt.startsWith(dateString)
+              (entry) => !entry.deletedAt && entry.habitId === habit.id && entry.completedAt.startsWith(dateString)
             );
+            const skipLog = state.skipLogs.find(
+              (entry) => !entry.deletedAt && entry.habitId === habit.id && entry.dateKey === dateString
+            );
+            const status = getCompletionStatus(log, skipLog, habit, dateString);
 
-            if (log && log.value / habit.target >= 1) {
+            if (status === 'complete' || status === 'skipped') {
               completed += 1;
             }
           });
@@ -897,12 +1003,11 @@ export const useKineticStore = create<KineticState>()(
         };
       },
 
-      // New Trends selectors
       getTotalVolume: () => {
         const state = get();
-        return state.habits.map((habit) => {
+        return state.habits.filter(h => !h.deletedAt).map((habit) => {
           const total = state.habitLogs
-            .filter((log) => log.habitId === habit.id)
+            .filter((log) => !log.deletedAt && log.habitId === habit.id)
             .reduce((sum, log) => sum + log.value, 0);
           return {
             habitId: habit.id,
@@ -915,7 +1020,7 @@ export const useKineticStore = create<KineticState>()(
 
       getBestStreak: (habitId) => {
         const state = get();
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         return habit?.bestStreak || 0;
       },
 
@@ -927,7 +1032,6 @@ export const useKineticStore = create<KineticState>()(
           let totalScheduled = 0;
           let totalCompletionValue = 0;
           
-          // Look back 12 weeks
           for (let week = 0; week < 12; week++) {
             const date = new Date();
             const currentDayIndex = date.getDay();
@@ -939,14 +1043,20 @@ export const useKineticStore = create<KineticState>()(
             
             const dateString = getDateString(date);
             
-            state.habits.forEach((habit) => {
+            state.habits.filter(h => !h.deletedAt).forEach((habit) => {
               if (habit.schedule.includes(day)) {
                 totalScheduled++;
                 const log = state.habitLogs.find(
-                  (log) => log.habitId === habit.id && log.completedAt.startsWith(dateString)
+                  (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(dateString)
                 );
-                if (log) {
-                    // Use weighted completion
+                const skipLog = state.skipLogs.find(
+                  (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === dateString
+                );
+                const status = getCompletionStatus(log, skipLog, habit, dateString);
+                
+                if (status === 'complete' || status === 'skipped') {
+                    totalCompletionValue += 1;
+                } else if (status === 'partial' && log) {
                     totalCompletionValue += Math.min(1, log.value / habit.target);
                 }
               }
@@ -966,12 +1076,11 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const hourCounts: { [key: number]: number } = {};
         
-        // Initialize all hours
         for (let i = 0; i < 24; i++) {
           hourCounts[i] = 0;
         }
         
-        state.habitLogs.forEach((log) => {
+        state.habitLogs.filter(l => !l.deletedAt).forEach((log) => {
           const hour = new Date(log.completedAt).getHours();
           const currentCount = hourCounts[hour] || 0;
           hourCounts[hour] = currentCount + 1;
@@ -985,7 +1094,7 @@ export const useKineticStore = create<KineticState>()(
 
       getHabitHealth: (habitId) => {
         const state = get();
-        const habit = state.habits.find((h) => h.id === habitId);
+        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (!habit) return 0;
         
         let weightedSum = 0;
@@ -994,28 +1103,31 @@ export const useKineticStore = create<KineticState>()(
         const habitCreatedAt = new Date(habit.createdAt);
         habitCreatedAt.setHours(0, 0, 0, 0);
 
-        // Last 7 days, weighted by recency
         for (let i = 0; i < 7; i++) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           date.setHours(0, 0, 0, 0);
           
-          if (date < habitCreatedAt) continue; // Ignore days before habit was created
+          if (date < habitCreatedAt) continue; 
           
           const dayOfWeek = getDayOfWeek(date);
-          
           if (!habit.schedule.includes(dayOfWeek)) continue;
           
-          const weight = 7 - i; // Day 0 (today) = 7, Day 6 = 1
+          const weight = 7 - i; 
           totalWeight += weight;
           
           const log = state.habitLogs.find(
-            (log) => log.habitId === habit.id && log.completedAt.startsWith(getDateString(date))
+            (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(getDateString(date))
           );
+          const skipLog = state.skipLogs.find(
+            (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === getDateString(date)
+          );
+          const status = getCompletionStatus(log, skipLog, habit, getDateString(date));
           
-          if (log) {
-            const completionPercent = Math.min(1, log.value / habit.target);
-            weightedSum += (weight * completionPercent);
+          if (status === 'complete' || status === 'skipped') {
+            weightedSum += weight;
+          } else if (status === 'partial' && log) {
+            weightedSum += (weight * (log.value / habit.target));
           }
         }
         
@@ -1026,23 +1138,17 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        const activeHabits = state.habits.filter((habit) => !habit.isArchived);
+        const activeHabits = state.habits.filter((habit) => !habit.deletedAt && !habit.isArchived);
         
-        // Get completions this week
         const weekLogs = state.habitLogs.filter(
-          (log) => new Date(log.completedAt) >= weekAgo
+          (log) => !log.deletedAt && new Date(log.completedAt) >= weekAgo
         );
         
-        // Count by habit (weighted?)
-        // For summary "Top Habit", maybe full completions or just total value?
-        // Let's stick to simple "number of days interacted with" for now or sum of completion rates?
-        // Let's use count of logs for simplicity
         const habitCounts: { [key: string]: number } = {};
         weekLogs.forEach((log) => {
           habitCounts[log.habitId] = (habitCounts[log.habitId] || 0) + 1;
         });
         
-        // Find top habit
         let topHabit: { name: string; completions: number } | null = null;
         let maxCompletions = 0;
         
@@ -1056,7 +1162,6 @@ export const useKineticStore = create<KineticState>()(
           }
         });
         
-        // Calculate completion rate for the week
         let totalScheduled = 0;
         let totalCompletedValue = 0;
         
@@ -1070,18 +1175,24 @@ export const useKineticStore = create<KineticState>()(
             if (habit.schedule.includes(dayOfWeek)) {
               totalScheduled++;
               const log = state.habitLogs.find(
-                (log) => log.habitId === habit.id && log.completedAt.startsWith(dateString)
+                (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(dateString)
               );
-              if (log) {
+              const skipLog = state.skipLogs.find(
+                (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === dateString
+              );
+              const status = getCompletionStatus(log, skipLog, habit, dateString);
+              
+              if (status === 'complete' || status === 'skipped') {
+                  totalCompletedValue += 1;
+              } else if (status === 'partial' && log) {
                   totalCompletedValue += Math.min(1, log.value / habit.target);
               }
             }
           });
         }
         
-        // Calculate average mood
         const weekMoods = state.moodLogs.filter(
-          (log) => new Date(log.loggedAt) >= weekAgo
+          (log) => !log.deletedAt && new Date(log.loggedAt) >= weekAgo
         );
         const avgMood = weekMoods.length > 0
           ? weekMoods.reduce((sum, log) => sum + log.score, 0) / weekMoods.length
@@ -1094,7 +1205,6 @@ export const useKineticStore = create<KineticState>()(
           momentumChange: state.momentumScore - state.previousWeekMomentum,
           avgMood,
           contract: get().getWeeklyContractStatus(),
-          missReasons: get().getWeeklyMissReasonStats(),
         };
       },
 
@@ -1112,13 +1222,13 @@ export const useKineticStore = create<KineticState>()(
           const dayOfWeek = getDayOfWeek(date);
           
           const scheduledHabits = state.habits.filter((h) => {
+            if (h.deletedAt) return false;
             const habitCreatedDate = new Date(h.createdAt);
             habitCreatedDate.setHours(0, 0, 0, 0);
             return h.schedule.includes(dayOfWeek) && habitCreatedDate <= date;
           });
           
           if (scheduledHabits.length === 0) {
-            // If it's the future, don't mark as complete/100%
             if (date > today) {
               data.push({ date: dateString, complete: false, partial: false, completionRate: 0 });
             } else {
@@ -1131,9 +1241,16 @@ export const useKineticStore = create<KineticState>()(
           
           scheduledHabits.forEach((habit) => {
              const log = state.habitLogs.find(
-                 (l) => l.habitId === habit.id && l.completedAt.startsWith(dateString)
+                 (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString)
              );
-             if (log) {
+             const skipLog = state.skipLogs.find(
+                 (l) => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString
+             );
+             const status = getCompletionStatus(log, skipLog, habit, dateString);
+             
+             if (status === 'complete' || status === 'skipped') {
+                 totalCompletion += 1;
+             } else if (status === 'partial' && log) {
                  totalCompletion += Math.min(1, log.value / habit.target);
              }
           });
@@ -1153,17 +1270,18 @@ export const useKineticStore = create<KineticState>()(
 
       getMoodHabitInsight: () => {
         const state = get();
-        if (state.moodLogs.length < 7 || state.habits.length === 0) return null;
+        const activeMoodLogs = state.moodLogs.filter(l => !l.deletedAt);
+        const activeHabits = state.habits.filter(h => !h.deletedAt);
+        if (activeMoodLogs.length < 7 || activeHabits.length === 0) return null;
         
-        // For each habit, calculate average mood on completion days vs non-completion days
         let bestInsight: { habit: string; moodDelta: number; message: string } | null = null;
         let maxDelta = 0;
         
-        state.habits.forEach((habit) => {
+        activeHabits.forEach((habit) => {
           const completionDates = new Set(
             state.habitLogs
-              .filter((log) => log.habitId === habit.id && (log.value / habit.target) >= 0.5) // Consider meaningful interaction
-              .map((log) => log.completedAt.split('T')[0] || '')
+              .filter((log) => !log.deletedAt && log.habitId === habit.id && (log.value / habit.target) >= 0.5)
+              .map((log) => getLocalDateKey(new Date(log.completedAt)))
           );
           
           let completionMoodSum = 0;
@@ -1171,8 +1289,8 @@ export const useKineticStore = create<KineticState>()(
           let nonCompletionMoodSum = 0;
           let nonCompletionMoodCount = 0;
           
-          state.moodLogs.forEach((moodLog) => {
-            const moodDate = moodLog.loggedAt.split('T')[0] || '';
+          activeMoodLogs.forEach((moodLog) => {
+            const moodDate = getLocalDateKey(new Date(moodLog.loggedAt));
             if (completionDates.has(moodDate)) {
               completionMoodSum += moodLog.score;
               completionMoodCount++;
@@ -1206,12 +1324,14 @@ export const useKineticStore = create<KineticState>()(
 
       getOverallStats: () => {
         const state = get();
-        const streaks = state.habits.map((h) => h.streak);
-        const bestStreaks = state.habits.map((h) => h.bestStreak || 0);
+        const activeHabits = state.habits.filter(h => !h.deletedAt);
+        const activeLogs = state.habitLogs.filter(l => !l.deletedAt);
+        const streaks = activeHabits.map((h) => h.streak);
+        const bestStreaks = activeHabits.map((h) => h.bestStreak || 0);
         
         return {
-          totalHabits: state.habits.length,
-          totalCompletions: state.habitLogs.length,
+          totalHabits: activeHabits.length,
+          totalCompletions: activeLogs.length,
           avgStreak: streaks.length > 0 ? Math.round(streaks.reduce((a, b) => a + b, 0) / streaks.length) : 0,
           longestStreak: bestStreaks.length > 0 ? Math.max(...bestStreaks) : 0,
         };
@@ -1231,7 +1351,7 @@ export const useKineticStore = create<KineticState>()(
           habits: state.habits,
           habitLogs: state.habitLogs,
           moodLogs: state.moodLogs,
-          missReasonLogs: state.missReasonLogs,
+          skipLogs: state.skipLogs,
           weeklyContractTarget: state.weeklyContractTarget,
         };
       },
@@ -1241,7 +1361,7 @@ export const useKineticStore = create<KineticState>()(
           habits: [],
           habitLogs: [],
           moodLogs: [],
-          missReasonLogs: [],
+          skipLogs: [],
           weeklyContractTarget: null,
           momentumScore: MOMENTUM_CONSTANTS.INITIAL_SCORE,
           lastDecayDate: null,
@@ -1251,8 +1371,9 @@ export const useKineticStore = create<KineticState>()(
 
       getJoinDate: () => {
         const state = get();
-        if (state.habits.length === 0) return 'Recently joined';
-        const oldestHabit = state.habits.reduce((oldest, habit) => 
+        const activeHabits = state.habits.filter(h => !h.deletedAt);
+        if (activeHabits.length === 0) return 'Recently joined';
+        const oldestHabit = activeHabits.reduce((oldest, habit) => 
           new Date(habit.createdAt) < new Date(oldest.createdAt) ? habit : oldest
         );
         if (!oldestHabit) return 'Recently joined';
@@ -1278,7 +1399,7 @@ export const useKineticStore = create<KineticState>()(
         
         if (shouldUpdate && typeof window !== 'undefined') {
           set({ previousWeekMomentum: state.momentumScore });
-          localStorage.setItem(lastUpdateKey, today.toISOString());
+          localStorage.setItem(lastUpdateKey, getLocalDateKey());
         }
       },
     }),
@@ -1294,7 +1415,8 @@ export const useKineticStore = create<KineticState>()(
           state.userName = state.userName ?? 'Your Name';
           state.userIcon = state.userIcon ?? 'star';
           state.weeklyContractTarget = state.weeklyContractTarget ?? null;
-          state.missReasonLogs = state.missReasonLogs ?? [];
+          state.skipLogs = state.skipLogs ?? [];
+          state.selectedDate = state.selectedDate ?? getLocalDateKey();
           state.habits = state.habits.map((habit) => ({
             ...habit,
             bestStreak: habit.bestStreak ?? habit.streak,

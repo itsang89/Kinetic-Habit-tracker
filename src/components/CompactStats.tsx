@@ -1,8 +1,10 @@
 'use client';
 
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useKineticStore, DayOfWeek } from '@/store/useKineticStore';
-import { useEffect, useState } from 'react';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import { Flame, CheckCircle2 } from 'lucide-react';
 
 import { useMounted } from '@/hooks/useMounted';
@@ -19,7 +21,7 @@ export default function CompactStats() {
     const today = new Date();
     const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][today.getDay()] as DayOfWeek;
     const todaysHabits = habits.filter(h => !h.isArchived && h.schedule.includes(dayOfWeek));
-    const todayString = today.toISOString().split('T')[0] || '';
+    const todayString = getLocalDateKey(today);
     
     if (todaysHabits.length > 0) {
       const completedCount = todaysHabits.filter(h => {

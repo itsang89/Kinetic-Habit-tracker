@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, TrendingUp, ListTodo, User } from 'lucide-react';
 import Link from 'next/link';

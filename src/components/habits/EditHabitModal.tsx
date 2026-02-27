@@ -1,8 +1,9 @@
 'use client';
 
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ToggleLeft, Timer, Hash } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { Habit, HabitCategory, DayOfWeek, HabitType, useKineticStore } from '@/store/useKineticStore';
 import { HABIT_ICON_OPTIONS } from '@/lib/habitIcons';
 import { useHabitForm } from '@/hooks/useHabitForm';

@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Flame, Target, Trophy } from 'lucide-react';
 import { Habit } from '@/store/useKineticStore';

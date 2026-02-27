@@ -1,10 +1,12 @@
 'use client';
 
+import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useKineticStore } from '@/store/useKineticStore';
 import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { useMounted } from '@/hooks/useMounted';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import { DEMO_HABIT_CONFIGS, generateHistoricalData, calculateStreaksForHabits } from '@/lib/demoData';
 
 export default function DemoDataLoader() {
@@ -29,7 +31,7 @@ export default function DemoDataLoader() {
     const today = new Date();
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - 90);
-    const startDateISO = startDate.toISOString();
+    const startDateISO = getLocalDateKey(startDate);
 
     // Update habits to have a past createdAt date
     useKineticStore.setState((state) => ({

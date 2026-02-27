@@ -1,7 +1,8 @@
 'use client';
 
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { Edit2, Check } from 'lucide-react';
 
 interface KineticSliderProps {

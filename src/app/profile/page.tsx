@@ -1,38 +1,11 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  Bell, 
-  Sun, 
-  Moon, 
-  Download, 
-  Upload,
-  FileJson, 
-  FileSpreadsheet,
-  Shield, 
-  HelpCircle, 
-  Info, 
-  ChevronRight,
-  Trash2,
-  ArrowLeft,
-  Edit3,
-  X,
-  Droplet,
-  Book,
-  Brain,
-  Dumbbell,
-  Heart,
-  Coffee,
-  Pencil,
-  Code,
-  Music,
-  Leaf,
-  Target,
-  Zap,
-  Star
-} from 'lucide-react';
-import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog, MissReasonLog } from '@/store/useKineticStore';
+import { LogOut, User, Bell, Sun, Moon, Download, Upload, FileJson, FileSpreadsheet, Shield, HelpCircle, Info, ChevronRight, Trash2, ArrowLeft, Edit3, X, Droplet, Book, Brain, Dumbbell, Heart, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star } from 'lucide-react';
+import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog, SkipLog } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 import { HABIT_ICON_MAP, HABIT_ICON_OPTIONS } from '@/lib/habitIcons';
 import BottomNav from '@/components/BottomNav';
@@ -47,10 +20,13 @@ export default function ProfilePage() {
   const { 
     theme, setTheme, getExportData, clearAllData, getJoinDate, 
     habits, habitLogs, moodLogs, userName, userIcon, updateUserProfile,
-    addHabit, logHabitCompletion, logMood, logMissReason, setWeeklyContractTarget
+    addHabit, logHabitCompletion, logMood, logSkip, setWeeklyContractTarget
   } = store;
+  const { user, signOut } = useAuth();
+  const router = useRouter();
   const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editName, setEditName] = useState(userName);
   const [editIcon, setEditIcon] = useState(userIcon);
@@ -82,7 +58,7 @@ export default function ProfilePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `kinetic-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `kinetic-backup-${getLocalDateKey()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -101,7 +77,7 @@ export default function ProfilePage() {
           habits: Habit[];
           habitLogs: HabitLog[];
           moodLogs: MoodLog[];
-          missReasonLogs?: MissReasonLog[];
+          skipLogs?: SkipLog[];
           weeklyContractTarget?: number | null;
         };
         
@@ -155,28 +131,28 @@ export default function ProfilePage() {
         for (const log of data.habitLogs) {
           const newHabitId = habitIdMap.get(log.habitId);
           if (newHabitId) {
-            const date = log.completedAt?.split('T')[0];
-            if (date) {
-              await logHabitCompletion(newHabitId, log.value || 1, date);
+            const dateKey = log.completedAt ? getLocalDateKey(new Date(log.completedAt)) : null;
+            if (dateKey) {
+              await logHabitCompletion(newHabitId, log.value || 1, dateKey);
             }
           }
         }
         
         // Import mood logs
         for (const mood of data.moodLogs) {
-          const date = mood.loggedAt?.split('T')[0];
-          if (date && mood.score >= 1 && mood.score <= 10) {
-            await logMood(mood.score, date);
+          const dateKey = mood.loggedAt ? getLocalDateKey(new Date(mood.loggedAt)) : null;
+          if (dateKey && mood.score >= 1 && mood.score <= 10) {
+            await logMood(mood.score, dateKey);
           }
         }
 
-        // Import miss reason logs
-        if (Array.isArray(data.missReasonLogs)) {
-          for (const miss of data.missReasonLogs) {
-            if (miss.habitId && miss.reason && miss.date) {
-              const newHabitId = habitIdMap.get(miss.habitId);
+        // Import skip logs
+        if (Array.isArray(data.skipLogs)) {
+          for (const skip of data.skipLogs) {
+            if (skip.habitId && skip.dateKey) {
+              const newHabitId = habitIdMap.get(skip.habitId);
               if (newHabitId) {
-                await logMissReason(newHabitId, miss.reason, miss.date);
+                await logSkip(newHabitId, skip.dateKey);
               }
             }
           }
@@ -236,7 +212,7 @@ export default function ProfilePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `kinetic-data-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `kinetic-data-${getLocalDateKey()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -246,6 +222,16 @@ export default function ProfilePage() {
   const handleLogout = () => {
     clearAllData();
     setShowLogoutConfirm(false);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setShowSignOutConfirm(false);
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to sign out:', error);
+    }
   };
 
   if (!mounted) return null;
@@ -296,9 +282,11 @@ export default function ProfilePage() {
                 onClick={() => setShowEditProfile(true)}
                 className="text-2xl font-bold text-[var(--theme-text-primary)] mb-1 cursor-pointer hover:text-[var(--theme-foreground)] transition-colors"
               >
-                {userName}
+                {user?.displayName || userName}
               </h2>
-              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">Local profile</p>
+              <p className="text-sm text-[var(--theme-text-secondary)] mb-1">
+                {user ? user.email : 'Local profile'}
+              </p>
               <p className="text-[10px] text-[var(--theme-text-muted)] uppercase tracking-wider mb-4">Member since {joinDate}</p>
               
               {/* Quick Stats */}
@@ -493,15 +481,67 @@ export default function ProfilePage() {
           >
             <p className="text-xs text-[var(--theme-text-muted)] mb-6">Version 1.0.0</p>
             
-            <button
-              onClick={() => setShowLogoutConfirm(true)}
-              className="flex items-center justify-center gap-2 mx-auto text-[var(--color-error)] hover:brightness-110 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span className="text-sm font-medium">Clear Local Data</span>
-            </button>
+            <div className="flex flex-col gap-4 max-w-[200px] mx-auto">
+              {user && (
+                <button
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="flex items-center justify-center gap-2 text-[var(--theme-text-primary)] hover:opacity-80 transition-opacity"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="text-sm font-medium">Sign Out</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                className="flex items-center justify-center gap-2 text-[var(--color-error)] hover:brightness-110 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="text-sm font-medium">Clear Local Data</span>
+              </button>
+            </div>
           </motion.div>
         </div>
+
+        {/* Sign Out Confirmation Modal */}
+        <AnimatePresence>
+          {showSignOutConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-base)]/70 backdrop-blur-sm"
+              onClick={() => setShowSignOutConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="glass p-6 max-w-sm w-full"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-2">Sign Out?</h3>
+                <p className="text-sm text-[var(--theme-text-secondary)] mb-6">
+                  Are you sure you want to sign out of your account? Your local data will remain until you clear it or log back in.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowSignOutConfirm(false)}
+                    className="flex-1 py-3 rounded-xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium hover:bg-[var(--theme-foreground)]/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex-1 py-3 rounded-xl bg-[var(--theme-foreground)] text-[var(--theme-background)] font-medium hover:opacity-90 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Logout Confirmation Modal */}
         <AnimatePresence>

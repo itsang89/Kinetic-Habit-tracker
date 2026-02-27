@@ -1,8 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Calendar } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
 import { useState, useEffect, useMemo } from 'react';
 
 type HeatmapDay = {
@@ -15,23 +18,27 @@ type HeatmapDay = {
 import { useMounted } from '@/hooks/useMounted';
 
 export default function HabitHeatmap() {
-  const { habits, habitLogs } = useKineticStore();
+  const { habits, habitLogs, skipLogs } = useKineticStore();
   const mounted = useMounted();
 
   const heatmapData = useMemo(() => {
     if (!mounted) return [];
     
+    const { habits, habitLogs, skipLogs } = useKineticStore.getState();
     const data: HeatmapDay[] = [];
     const today = new Date();
     
     for (let i = 364; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().split('T')[0] || '';
+      const dateString = getLocalDateKey(date);
       
-      const completions = habitLogs.filter(
-        (log) => log.completedAt.startsWith(dateString)
-      ).length;
+      const completions = habits.filter(h => !h.deletedAt).reduce((acc, habit) => {
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString));
+        const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString);
+        const status = getCompletionStatus(log, skipLog, habit, dateString);
+        return (status === 'complete' || status === 'skipped') ? acc + 1 : acc;
+      }, 0);
       
       data.push({
         date: dateString,
@@ -42,7 +49,7 @@ export default function HabitHeatmap() {
     }
     
     return data.reverse();
-  }, [mounted, habitLogs]);
+  }, [mounted, habits, habitLogs, skipLogs]);
   
   const getIntensityColor = (count: number) => {
     if (count === 0) return 'bg-[var(--bg-base)] border border-[var(--theme-border)]';

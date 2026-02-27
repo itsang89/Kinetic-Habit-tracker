@@ -1,28 +1,38 @@
-import { Habit, HabitLog, DayOfWeek } from '@/store/useKineticStore';
+import { Habit, HabitLog, DayOfWeek, SkipLog } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus } from '@/lib/completionUtils';
 
-export function calculateHabitStats(habit: Habit, habitLogs: HabitLog[]) {
-  const logs = habitLogs.filter(l => l.habitId === habit.id);
+export function calculateHabitStats(habit: Habit, habitLogs: HabitLog[], skipLogs: SkipLog[]) {
+  const logs = habitLogs.filter(l => !l.deletedAt && l.habitId === habit.id);
   const totalLogs = logs.length;
   
   // Success rate (last 30 days)
   const last30Days = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const habitCreatedAt = new Date(habit.createdAt);
+  
+  const parseDate = (dStr: string) => {
+    if (dStr.includes('T')) return new Date(dStr);
+    const [y, m, d] = dStr.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
+  const habitCreatedAt = parseDate(habit.createdAt);
   habitCreatedAt.setHours(0, 0, 0, 0);
 
   for (let i = 29; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
-    const dateString = date.toISOString().split('T')[0] || '';
-    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
+    const dateString = getLocalDateKey(date);
     
-    const isScheduled = habit.schedule.includes(dayOfWeek) && date >= habitCreatedAt && date <= today;
+    const log = logs.find(l => l.completedAt.startsWith(dateString));
+    const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString);
+    const status = getCompletionStatus(log, skipLog, habit, dateString);
     
-    if (isScheduled) {
-      const completed = logs.some(l => l.completedAt.startsWith(dateString));
-      last30Days.push({ date: dateString, scheduled: true, completed });
+    if (status !== 'not-scheduled') {
+      const isSuccessful = status === 'complete' || status === 'skipped';
+      last30Days.push({ date: dateString, scheduled: true, completed: isSuccessful });
     }
   }
   
@@ -42,7 +52,7 @@ export function calculateHabitStats(habit: Habit, habitLogs: HabitLog[]) {
   };
 }
 
-export function generateCalendarData(habit: Habit, habitLogs: HabitLog[], calendarMonth: Date) {
+export function generateCalendarData(habit: Habit, habitLogs: HabitLog[], skipLogs: SkipLog[], calendarMonth: Date) {
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -50,7 +60,14 @@ export function generateCalendarData(habit: Habit, habitLogs: HabitLog[], calend
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const habitCreatedAt = new Date(habit.createdAt);
+
+  const parseDate = (dStr: string) => {
+    if (dStr.includes('T')) return new Date(dStr);
+    const [y, m, d] = dStr.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
+  const habitCreatedAt = parseDate(habit.createdAt);
   habitCreatedAt.setHours(0, 0, 0, 0);
   
   const days = [];
@@ -68,23 +85,23 @@ export function generateCalendarData(habit: Habit, habitLogs: HabitLog[], calend
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(year, month, day);
     date.setHours(0, 0, 0, 0);
-    const dateString = date.toISOString().split('T')[0] || '';
-    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
+    const dateString = getLocalDateKey(date);
+    
+    const log = habitLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString));
+    const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString);
+    const status = getCompletionStatus(log, skipLog, habit, dateString);
     
     const isFuture = date > today;
     const isBeforeCreation = date < habitCreatedAt;
-    
-    const isScheduled = habit.schedule.includes(dayOfWeek);
-    const log = habitLogs.find(l => l.habitId === habit.id && l.completedAt.startsWith(dateString));
     
     days.push({
       date: dateString,
       day,
       isCurrentMonth: true,
-      isScheduled,
-      isCompleted: !!log,
-      isPartial: log ? log.value < habit.target : false,
-      isShielded: false,
+      isScheduled: status !== 'not-scheduled',
+      isCompleted: status === 'complete' || status === 'skipped',
+      isPartial: status === 'partial',
+      isShielded: status === 'skipped',
       value: log?.value || null,
       isFuture,
       isBeforeCreation,

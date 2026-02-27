@@ -1,4 +1,5 @@
 import { Habit, HabitLog, MoodLog, DayOfWeek, HabitCategory, HabitIcon, HabitType } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -28,7 +29,7 @@ export function generateHistoricalData(habits: Habit[], days = 90) {
   for (let daysAgo = days; daysAgo >= 0; daysAgo--) {
     const date = new Date(today);
     date.setDate(date.getDate() - daysAgo);
-    const dateString = date.toISOString().split('T')[0] || '';
+    const dateString = getLocalDateKey(date);
     const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
     
     habits.forEach((habit, habitIndex) => {
@@ -64,7 +65,7 @@ export function generateHistoricalData(habits: Habit[], days = 90) {
         logs.push({
           id: generateId(),
           habitId: habit.id,
-          completedAt: completedAt.toISOString(),
+          completedAt: `${getLocalDateKey(completedAt)}T${completedAt.toLocaleTimeString('sv')}`,
           value: value,
         });
       }
@@ -82,7 +83,7 @@ export function generateHistoricalData(habits: Habit[], days = 90) {
     moods.push({
       id: generateId(),
       score: moodScore,
-      loggedAt: new Date(date.setHours(21, 0, 0, 0)).toISOString(),
+      loggedAt: `${getLocalDateKey(date)}T21:00:00`,
     });
   }
   
@@ -99,7 +100,7 @@ export function calculateStreaksForHabits(habits: Habit[], logs: HabitLog[], day
     for (let daysAgo = days; daysAgo >= 0; daysAgo--) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysAgo);
-      const dateString = date.toISOString().split('T')[0] || '';
+      const dateString = getLocalDateKey(date);
       const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
       
       if (habit.schedule.includes(dayOfWeek)) {

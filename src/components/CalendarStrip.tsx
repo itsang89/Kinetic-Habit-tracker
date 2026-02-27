@@ -1,7 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useKineticStore, DayOfWeek } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
+import { getCompletionStatus, CompletionStatus } from '@/lib/completionUtils';
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -13,7 +16,7 @@ interface CalendarStripProps {
 import { useMounted } from '@/hooks/useMounted';
 
 export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarStripProps) {
-  const { habitLogs, habits } = useKineticStore();
+  const { habitLogs, habits, skipLogs } = useKineticStore();
   const [baseDate, setBaseDate] = useState(new Date());
   const mounted = useMounted();
 
@@ -61,37 +64,37 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
     }
   };
 
-  const getDayStatus = (date: Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const checkDate = new Date(date);
-    checkDate.setHours(0, 0, 0, 0);
-
-    // Don't mark future dates as missed
-    if (checkDate > today) return 'none';
-
-    const dateString = date.toISOString().split('T')[0];
-    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as DayOfWeek;
+  const getDayStatus = (date: Date): CompletionStatus | 'none' => {
+    const dateString = getLocalDateKey(date);
     
     // Check if any habit was scheduled for this day AND existed on this day
-    const scheduledHabits = habits.filter(h => {
-      const habitCreatedDate = new Date(h.createdAt);
+    const dayHabits = habits.filter(h => {
+      const parseDate = (dStr: string) => {
+        if (!dStr) return new Date();
+        if (dStr.includes('T')) return new Date(dStr);
+        const [y, m, d] = dStr.split('-').map(Number);
+        return new Date(y, (m || 1) - 1, d || 1);
+      };
+      const habitCreatedDate = parseDate(h.createdAt);
       habitCreatedDate.setHours(0, 0, 0, 0);
-      return h.schedule.includes(dayOfWeek) && habitCreatedDate <= checkDate;
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      return habitCreatedDate <= checkDate;
     });
-    
-    if (scheduledHabits.length === 0) return 'none';
 
-    // Check completion
-    const completedCount = scheduledHabits.filter(h => 
-      habitLogs.some(l => l.habitId === h.id && l.completedAt.startsWith(dateString || ''))
-    ).length;
+    const statuses = dayHabits.map(h => {
+      const log = habitLogs.find(l => !l.deletedAt && l.habitId === h.id && l.completedAt.startsWith(dateString));
+      const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === h.id && l.dateKey === dateString);
+      return getCompletionStatus(log, skipLog, h, dateString);
+    }).filter(s => s !== 'not-scheduled');
 
-    if (completedCount === scheduledHabits.length) return 'complete';
-    if (completedCount > 0) return 'partial';
+    if (statuses.length === 0) return 'none';
+
+    if (statuses.every(s => s === 'complete' || s === 'skipped')) return 'complete';
+    if (statuses.some(s => s === 'complete' || s === 'partial' || s === 'skipped')) return 'partial';
+    if (statuses.every(s => s === 'missed')) return 'missed';
     
-    // Only mark as missed if it's in the past
-    return 'missed';
+    return 'none';
   };
 
   const isSameDay = (d1: Date, d2: Date) => {
@@ -147,7 +150,7 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
 
             return (
               <motion.div 
-                key={date.toISOString()} 
+                key={getLocalDateKey(date)} 
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
