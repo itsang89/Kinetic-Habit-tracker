@@ -17,14 +17,16 @@ type HeatmapDay = {
 
 import { useMounted } from '@/hooks/useMounted';
 
-export default function HabitHeatmap() {
+interface HabitHeatmapProps {
+  habitId?: string;
+}
+
+export default function HabitHeatmap({ habitId }: HabitHeatmapProps = {}) {
   const { habits, habitLogs, skipLogs } = useKineticStore();
   const mounted = useMounted();
 
   const heatmapData = useMemo(() => {
     if (!mounted) return [];
-    
-    const { habits, habitLogs, skipLogs } = useKineticStore.getState();
     const data: HeatmapDay[] = [];
     const today = new Date();
     
@@ -33,7 +35,8 @@ export default function HabitHeatmap() {
       date.setDate(date.getDate() - i);
       const dateString = getLocalDateKey(date);
       
-      const completions = habits.filter(h => !h.deletedAt).reduce((acc, habit) => {
+      const habitsToCheck = habitId ? habits.filter(h => !h.deletedAt && h.id === habitId) : habits.filter(h => !h.deletedAt);
+      const completions = habitsToCheck.reduce((acc, habit) => {
         const log = habitLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateString));
         const skipLog = skipLogs.find(l => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateString);
         const status = getCompletionStatus(log, skipLog, habit, dateString);
@@ -49,7 +52,7 @@ export default function HabitHeatmap() {
     }
     
     return data.reverse();
-  }, [mounted, habits, habitLogs, skipLogs]);
+  }, [mounted, habits, habitLogs, skipLogs, habitId]);
   
   const getIntensityColor = (count: number) => {
     if (count === 0) return 'bg-[var(--bg-base)] border border-[var(--theme-border)]';
@@ -84,7 +87,10 @@ export default function HabitHeatmap() {
 
   const monthLabels = getMonthLabels();
 
-  if (!mounted || habits.length === 0) return null;
+  const activeHabits = habits.filter(h => !h.deletedAt);
+  if (!mounted) return null;
+  if (habitId && !activeHabits.some(h => h.id === habitId)) return null;
+  if (!habitId && activeHabits.length === 0) return null;
 
   return (
     <motion.div

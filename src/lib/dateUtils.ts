@@ -59,3 +59,16 @@ export const isSameDay = (d1: Date, d2: Date): boolean => {
 export const isToday = (date: Date): boolean => {
   return isSameDay(date, new Date());
 };
+
+export const daysBetween = (start: string, end: string): number => {
+  const startDate = new Date(start + 'T00:00:00');
+  const endDate = new Date(end + 'T00:00:00');
+  const diff = endDate.getTime() - startDate.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+};
+
+export const addDays = (dateKey: string, days: number): string => {
+  const d = new Date(dateKey + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return getLocalDateKey(d);
+};

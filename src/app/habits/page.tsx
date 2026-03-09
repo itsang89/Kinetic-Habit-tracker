@@ -86,8 +86,8 @@ function HabitsContent() {
   // Filter and sort habits
   const filteredHabits = useMemo(() => {
     if (!mounted) return [];
-    
-    let result = [...habits];
+
+    let result = habits.filter((h) => !h.deletedAt);
 
     // Search filter
     if (searchQuery) {
@@ -234,7 +234,7 @@ function HabitsContent() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-[var(--theme-text-primary)]">Habit Manager</h1>
-              <p className="text-sm text-[var(--theme-text-secondary)]">{habits.filter(h => !h.isArchived).length} active habits</p>
+              <p className="text-sm text-[var(--theme-text-secondary)]">{habits.filter(h => !h.deletedAt && !h.isArchived).length} active habits</p>
             </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -437,7 +437,7 @@ function HabitsContent() {
           </div>
 
           {/* Habit List - Grouped by Category */}
-          {habits.length === 0 ? (
+          {habits.filter(h => !h.deletedAt).length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -519,7 +519,7 @@ function HabitsContent() {
               )}
 
               {/* No results */}
-              {filteredHabits.length === 0 && habits.length > 0 && (
+              {filteredHabits.length === 0 && habits.filter(h => !h.deletedAt).length > 0 && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Clock, Brain } from 'lucide-react';
+import HabitHeatmap from '@/components/HabitHeatmap';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { Habit } from '@/store/useKineticStore';
 
@@ -99,6 +100,11 @@ export default function HabitAnalytics({
             You usually complete this at <span className="text-[var(--theme-text-primary)] font-medium">{peakTime || 'various times'}</span>
           </p>
         </motion.div>
+      </div>
+
+      {/* Per-habit heatmap */}
+      <div className="mb-4">
+        <HabitHeatmap habitId={habit.id} />
       </div>
 
       {/* Correlation Insight */}

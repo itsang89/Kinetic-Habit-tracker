@@ -14,6 +14,8 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import { useMounted } from '@/hooks/useMounted';
 import { useHabitProgress } from '@/hooks/useHabitProgress';
 import { calculateHabitStats, generateCalendarData } from '@/lib/habitCalculations';
+import { calculateMomentumChange } from '@/lib/momentumUtils';
+import { MOMENTUM_CONSTANTS } from '@/lib/constants';
 import Link from 'next/link';
 
 // Detail sub-components
@@ -92,30 +94,33 @@ export default function HabitDetailPage() {
 
   const scoreTrend = useMemo(() => {
     if (!habit) return [];
-    
+
     const data: { date: string; score: number }[] = [];
-    let runningScore = 50;
-    
+    let runningScore: number = MOMENTUM_CONSTANTS.INITIAL_SCORE;
+
     for (let i = 89; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateString = getLocalDateKey(date);
       const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()] as any;
-      
+
+      runningScore -= MOMENTUM_CONSTANTS.DAILY_DECAY;
+
       if (habit.schedule.includes(dayOfWeek)) {
-        const completed = habitLogs.some(l => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateString));
-        if (completed) {
-          runningScore = Math.min(100, runningScore + 3);
-        } else {
-          runningScore = Math.max(0, runningScore - 5);
-        }
+        const log = habitLogs.find(l => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateString));
+        const completionRate = log ? Math.min(1, log.value / habit.target) : 0;
+        const isMissed = !log;
+        const change = calculateMomentumChange(completionRate, isMissed);
+        runningScore += change;
       }
-      
+
+      runningScore = Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, runningScore));
+
       if (i % 7 === 0) {
         data.push({ date: dateString, score: Math.round(runningScore) });
       }
     }
-    
+
     return data;
   }, [habit, habitLogs, habitId]);
 

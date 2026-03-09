@@ -15,9 +15,14 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  deleteUser,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  EmailAuthProvider
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { deleteAllUserData } from '@/lib/firestore';
 import { useKineticStore } from '@/store/useKineticStore';
 
 interface AuthContextType {
@@ -28,6 +33,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +76,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
   };
 
+  const deleteAccount = async (password?: string) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No user signed in');
+
+    if (user.providerData[0]?.providerId === 'password') {
+      if (!password) throw new Error('Password required');
+      const credential = EmailAuthProvider.credential(user.email!, password);
+      await reauthenticateWithCredential(user, credential);
+    } else if (user.providerData[0]?.providerId === 'google.com') {
+      const provider = new GoogleAuthProvider();
+      await reauthenticateWithPopup(user, provider);
+    }
+
+    await deleteAllUserData(user.uid);
+    await deleteUser(user);
+    await useKineticStore.getState().clearAllData();
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -78,7 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUpWithEmail, 
       signInWithGoogle, 
       sendPasswordReset, 
-      signOut 
+      signOut,
+      deleteAccount
     }}>
       {children}
     </AuthContext.Provider>

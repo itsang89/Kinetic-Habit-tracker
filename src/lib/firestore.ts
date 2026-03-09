@@ -5,11 +5,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
-  query, 
-  where, 
-  Timestamp,
-  orderBy,
-  limit,
+  deleteDoc,
   writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -87,23 +83,71 @@ export const deleteSubCollectionItem = async (
   await updateDoc(docRef, { deletedAt: new Date().toISOString() });
 };
 
-// Batch upsert helper for debounced sync
+const BATCH_CHUNK_SIZE = 450;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+export interface BatchUpsertResult {
+  succeeded: number;
+  failed: number;
+}
+
+// Batch upsert helper for debounced sync (chunks to avoid Firestore 500-op limit)
 export const batchUpsert = async <T extends { id: string }>(
   userId: string,
   collectionName: string,
   items: T[]
-) => {
-  if (items.length === 0) return;
-  
-  const batch = writeBatch(db);
-  items.forEach((item) => {
-    const docRef = doc(db, 'users', userId, collectionName, item.id);
-    batch.set(docRef, item, { merge: true });
-  });
-  await batch.commit();
+): Promise<BatchUpsertResult> => {
+  if (items.length === 0) return { succeeded: 0, failed: 0 };
+
+  const chunks = chunkArray(items, BATCH_CHUNK_SIZE);
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const chunk of chunks) {
+    try {
+      const batch = writeBatch(db);
+      chunk.forEach((item) => {
+        const docRef = doc(db, 'users', userId, collectionName, item.id);
+        batch.set(docRef, item, { merge: true });
+      });
+      await batch.commit();
+      succeeded += chunk.length;
+    } catch (error) {
+      console.error(`Firestore batchUpsert failed for ${collectionName}:`, error);
+      failed += chunk.length;
+    }
+  }
+
+  return { succeeded, failed };
 };
 
 // Specialized Fetchers
+export const deleteAllUserData = async (userId: string): Promise<void> => {
+  const collections = ['habits', 'habit_logs', 'mood_logs', 'skip_logs'] as const;
+  for (const collName of collections) {
+    const collRef = getCollectionRef(userId, collName);
+    const snapshot = await getDocs(collRef);
+    const chunks = chunkArray(snapshot.docs, BATCH_CHUNK_SIZE);
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+  const userDocRef = doc(db, 'users', userId);
+  const userSnap = await getDoc(userDocRef);
+  if (userSnap.exists()) {
+    await deleteDoc(userDocRef);
+  }
+};
+
 export const getAllUserData = async (userId: string) => {
   const [profile, habits, habitLogs, moodLogs, skipLogs] = await Promise.all([
     getProfile(userId),

@@ -22,7 +22,7 @@ export default function MomentumScore() {
 
   useEffect(() => {
     if (!mounted) return;
-    
+
     const diff = momentumScore - displayScore;
     if (diff > 0) setTrend('up');
     else if (diff < 0) setTrend('down');
@@ -34,7 +34,6 @@ export default function MomentumScore() {
         return prev + (momentumScore > prev ? 1 : -1);
       });
     }, 20);
-
     return () => clearInterval(interval);
   }, [momentumScore, displayScore, mounted]);
 

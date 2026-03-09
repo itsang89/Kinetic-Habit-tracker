@@ -6,7 +6,7 @@ import { useKineticStore, DayOfWeek } from '@/store/useKineticStore';
 import { getLocalDateKey } from '@/lib/dateUtils';
 import { getCompletionStatus, CompletionStatus } from '@/lib/completionUtils';
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 interface CalendarStripProps {
   selectedDate: Date;
@@ -113,6 +113,12 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
 
   if (!mounted) return null;
 
+  const handleTodayClick = () => {
+    const today = new Date();
+    setBaseDate(today);
+    onDateSelect(today);
+  };
+
   return (
     <div className="mb-6">
       <div className="flex justify-between items-center mb-4 px-1">
@@ -120,6 +126,18 @@ export default function CalendarStrip({ selectedDate, onDateSelect }: CalendarSt
           {weekDates[0]?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
         <div className="flex items-center gap-4">
+          {!isCurrentWeek && (
+            <motion.button
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              onClick={handleTodayClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--brand-main)]/15 border border-[var(--brand-main)]/30 text-[var(--brand-main)] text-xs font-medium hover:bg-[var(--brand-main)]/25 transition-colors"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Today
+            </motion.button>
+          )}
           <button onClick={goToPreviousWeek} className="p-1 hover:bg-[var(--brand-main)]/15 rounded-full transition-colors">
             <ChevronLeft className="w-4 h-4 text-[var(--theme-text-secondary)]" />
           </button>

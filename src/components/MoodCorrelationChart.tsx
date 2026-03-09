@@ -25,7 +25,9 @@ export default function MoodCorrelationChart() {
 
   const data = mounted ? getMoodCorrelationData() : [];
 
-  if (!mounted || moodLogs.length < 3 || habits.length === 0) return null;
+  const activeMoodLogs = moodLogs.filter((l) => !l.deletedAt);
+  const activeHabits = habits.filter((h) => !h.deletedAt);
+  if (!mounted || activeMoodLogs.length < 7 || activeHabits.length === 0) return null;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

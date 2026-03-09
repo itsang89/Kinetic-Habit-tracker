@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Shield, Flame, MoreHorizontal } from 'lucide-react';
+import { haptic } from '@/lib/haptics';
 import { Habit, useKineticStore } from '@/store/useKineticStore';
 import { getLocalDateKey } from '@/lib/dateUtils';
 import KineticSlider from './habits/KineticSlider';
@@ -43,16 +44,18 @@ function HabitCardComponent({ habit, index, date }: HabitCardProps) {
     if (isCompleted) {
       await removeHabitCompletion(habit.id, targetDateKey);
     } else {
+      haptic.light();
       await logHabitCompletion(habit.id, habit.target, targetDateKey);
     }
   };
 
   const handleValueChange = async (newValue: number) => {
-      if (newValue === 0) {
-          await removeHabitCompletion(habit.id, targetDateKey);
-      } else {
-          await logHabitCompletion(habit.id, newValue, targetDateKey);
-      }
+    if (newValue === 0) {
+      await removeHabitCompletion(habit.id, targetDateKey);
+    } else {
+      haptic.light();
+      await logHabitCompletion(habit.id, newValue, targetDateKey);
+    }
   };
 
   return (

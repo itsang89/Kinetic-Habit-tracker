@@ -5,11 +5,12 @@ import {
   getAllUserData, 
   updateProfile, 
   batchUpsert,
+  deleteAllUserData,
   UserProfile 
 } from '@/lib/firestore';
 
 import { MOMENTUM_CONSTANTS } from '@/lib/constants';
-import { getLocalDateKey } from '@/lib/dateUtils';
+import { getLocalDateKey, daysBetween, addDays } from '@/lib/dateUtils';
 import { getCompletionStatus } from '@/lib/completionUtils';
 import { calculateMomentumChange } from '@/lib/momentumUtils';
 
@@ -174,9 +175,10 @@ interface KineticState {
 
   // Data export helpers
   getExportData: () => { habits: Habit[]; habitLogs: HabitLog[]; moodLogs: MoodLog[]; skipLogs: SkipLog[]; weeklyContractTarget: number | null };
-  clearAllData: () => void;
+  clearAllData: () => Promise<void>;
   getJoinDate: () => string;
   updateWeeklyMomentum: () => void;
+  loadDemoData: () => Promise<void>;
 }
 
 const generateId = () => {
@@ -189,6 +191,23 @@ const generateId = () => {
 const getDateString = (date: Date = new Date()) => {
   return getLocalDateKey(date);
 };
+
+function buildLogIndex(logs: HabitLog[]): Map<string, HabitLog> {
+  const m = new Map<string, HabitLog>();
+  for (const log of logs.filter((l) => !l.deletedAt)) {
+    const dateKey = log.completedAt.includes('T') ? log.completedAt.split('T')[0] : log.completedAt;
+    m.set(`${log.habitId}:${dateKey}`, log);
+  }
+  return m;
+}
+
+function buildSkipIndex(skips: SkipLog[]): Map<string, SkipLog> {
+  const m = new Map<string, SkipLog>();
+  for (const s of skips.filter((l) => !l.deletedAt)) {
+    m.set(`${s.habitId}:${s.dateKey}`, s);
+  }
+  return m;
+}
 
 const getDayOfWeek = (date: Date = new Date()): DayOfWeek => {
   const days: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -430,88 +449,84 @@ export const useKineticStore = create<KineticState>()(
       },
 
       logHabitCompletion: async (habitId, value = 1, dateKey) => {
-        const state = get();
-        const targetDateKey = dateKey || state.selectedDate;
-        
-        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
-        if (!habit) return;
+        set((state) => {
+          const targetDateKey = dateKey || state.selectedDate;
+          const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+          if (!habit) return state;
 
-        const existingLogIndex = state.habitLogs.findIndex(
-          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
-        );
-        
-        let logs = [...state.habitLogs];
-        
-        const existingLog = existingLogIndex >= 0 ? state.habitLogs[existingLogIndex] : undefined;
-        const oldValue = existingLog ? existingLog.value : 0;
+          const logs = state.habitLogs.filter((l) => !l.deletedAt);
+          const existingLogIndex = state.habitLogs.findIndex(
+            (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
+          );
+          const existingLog = existingLogIndex >= 0 ? state.habitLogs[existingLogIndex] : undefined;
+          const oldValue = existingLog ? existingLog.value : 0;
 
-        if (existingLogIndex >= 0 && existingLog) {
-            logs[existingLogIndex] = { ...existingLog, value };
-        } else {
-            logs.push({
-                id: generateId(),
-                habitId,
-                completedAt: targetDateKey === getLocalDateKey() 
-                  ? `${targetDateKey}T${new Date().toLocaleTimeString('sv')}`
-                  : `${targetDateKey}T12:00:00`,
-                value,
-            });
-        }
-        
-        const updatedLogs = logs;
-        const streakData = recalculateStreak(habit, updatedLogs, state.skipLogs, targetDateKey);
-        const newStreak = streakData.streak;
-        const newBestStreak = streakData.bestStreak;
+          let newLogs: HabitLog[];
+          if (existingLogIndex >= 0 && existingLog) {
+            newLogs = state.habitLogs.map((l, idx) =>
+              idx === existingLogIndex ? { ...l, value } : l
+            );
+          } else {
+            const newLog: HabitLog = {
+              id: generateId(),
+              habitId,
+              completedAt: targetDateKey === getLocalDateKey()
+                ? `${targetDateKey}T${new Date().toLocaleTimeString('sv')}`
+                : `${targetDateKey}T12:00:00`,
+              value,
+            };
+            newLogs = [...state.habitLogs, newLog];
+          }
 
-        const oldPercent = Math.min(1, oldValue / habit.target);
-        const newPercent = Math.min(1, value / habit.target);
-        const momentumChange = calculateMomentumChange(newPercent, false) - calculateMomentumChange(oldPercent, false);
+          const streakData = recalculateStreak(habit, newLogs, state.skipLogs, targetDateKey);
+          const oldPercent = Math.min(1, oldValue / habit.target);
+          const newPercent = Math.min(1, value / habit.target);
+          const momentumChange = calculateMomentumChange(newPercent, false) - calculateMomentumChange(oldPercent, false);
 
-        set((state) => ({
-            habitLogs: logs,
-            skipLogs: state.skipLogs.map((l) => 
+          return {
+            habitLogs: newLogs,
+            skipLogs: state.skipLogs.map((l) =>
               (l.habitId === habitId && l.dateKey === targetDateKey) ? { ...l, deletedAt: new Date().toISOString() } : l
             ),
             habits: state.habits.map((h) =>
-              h.id === habitId ? { ...h, streak: newStreak, bestStreak: newBestStreak } : h
+              h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
             ),
             momentumScore: Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore + momentumChange)),
-        }));
+          };
+        });
         debouncedSyncFn(get);
       },
 
       removeHabitCompletion: async (habitId, dateKey) => {
-        const state = get();
-        const targetDateKey = dateKey || state.selectedDate;
-        
-        const logToRemoveIndex = state.habitLogs.findIndex(
-          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
-        );
-        
-        if (logToRemoveIndex === -1) return;
+        set((state) => {
+          const targetDateKey = dateKey || state.selectedDate;
+          const logToRemoveIndex = state.habitLogs.findIndex(
+            (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(targetDateKey)
+          );
+          if (logToRemoveIndex === -1) return state;
 
-        const logToRemove = state.habitLogs[logToRemoveIndex];
-        if (!logToRemove) return;
-        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
-        if (habit) {
+          const logToRemove = state.habitLogs[logToRemoveIndex];
+          if (!logToRemove) return state;
+          const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+          if (!habit) return state;
+
           const now = new Date().toISOString();
-          const updatedLogs = state.habitLogs.map((l, idx) => 
+          const updatedLogs = state.habitLogs.map((l, idx) =>
             idx === logToRemoveIndex ? { ...l, deletedAt: now } : l
           );
           const streakData = recalculateStreak(habit, updatedLogs, state.skipLogs, targetDateKey);
-          
           const percentRemoved = Math.min(1, logToRemove.value / habit.target);
           const momentumChange = calculateMomentumChange(percentRemoved, false);
 
-          set((state) => ({
+          return {
             habitLogs: updatedLogs,
             habits: state.habits.map((h) =>
               h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
             ),
             momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - momentumChange),
-          }));
-          debouncedSyncFn(get);
-        }
+          };
+        });
+        debouncedSyncFn(get);
       },
 
       logMood: async (score, dateKey) => {
@@ -542,50 +557,47 @@ export const useKineticStore = create<KineticState>()(
       },
 
       logSkip: async (habitId, dateKey, reason) => {
-        const state = get();
-        const targetDateKey = dateKey || state.selectedDate;
-        const now = new Date().toISOString();
+        set((state) => {
+          const targetDateKey = dateKey || state.selectedDate;
+          const now = new Date().toISOString();
+          const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
+          if (!habit) return state;
 
-        const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
-        if (!habit) return;
+          const existingSkip = state.skipLogs.find(
+            (l) => !l.deletedAt && l.habitId === habitId && l.dateKey === targetDateKey
+          );
+          if (existingSkip) {
+            return {
+              skipLogs: state.skipLogs.map((l) =>
+                l.id === existingSkip.id ? { ...l, reason } : l
+              ),
+            };
+          }
 
-        const existingSkip = state.skipLogs.find(
-          (l) => !l.deletedAt && l.habitId === habitId && l.dateKey === targetDateKey
-        );
-        if (existingSkip) {
-          // If skip exists, update reason
-          set((state) => ({
-            skipLogs: state.skipLogs.map((l) =>
-              l.id === existingSkip.id ? { ...l, reason } : l
+          const newSkip: SkipLog = {
+            id: generateId(),
+            habitId,
+            dateKey: targetDateKey,
+            reason,
+            createdAt: now,
+          };
+
+          const updatedHabitLogs = state.habitLogs.map((l) =>
+            !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(targetDateKey)
+              ? { ...l, deletedAt: now }
+              : l
+          );
+
+          const streakData = recalculateStreak(habit, updatedHabitLogs, [...state.skipLogs, newSkip], targetDateKey);
+
+          return {
+            skipLogs: [...state.skipLogs, newSkip],
+            habitLogs: updatedHabitLogs,
+            habits: state.habits.map((h) =>
+              h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
             ),
-          }));
-          debouncedSyncFn(get);
-          return;
-        }
-
-        const newSkip: SkipLog = {
-          id: generateId(),
-          habitId,
-          dateKey: targetDateKey,
-          reason,
-          createdAt: now,
-        };
-
-        const updatedHabitLogs = state.habitLogs.map((l) => 
-          (!l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(targetDateKey))
-          ? { ...l, deletedAt: now }
-          : l
-        );
-
-        const streakData = recalculateStreak(habit, updatedHabitLogs, [...state.skipLogs, newSkip], targetDateKey);
-
-        set((state) => ({
-          skipLogs: [...state.skipLogs, newSkip],
-          habitLogs: updatedHabitLogs,
-          habits: state.habits.map((h) =>
-            h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
-          ),
-        }));
+          };
+        });
         debouncedSyncFn(get);
       },
 
@@ -660,19 +672,19 @@ export const useKineticStore = create<KineticState>()(
       fetchFromCloud: async (forcePushIfEmpty = false) => {
         const user = auth.currentUser;
         if (!user) return;
-        
+
         set({ isSyncing: true, syncError: null });
         try {
           const data = await getAllUserData(user.uid);
-          
-          if (data.profile || data.habits.length > 0) {
+
+          if (data.profile || data.habits.length > 0 || data.habitLogs.length > 0 || data.moodLogs.length > 0 || data.skipLogs.length > 0) {
             set({
               userName: data.profile?.userName ?? get().userName,
               userIcon: data.profile?.userIcon ?? get().userIcon,
-              habits: data.habits.length > 0 ? data.habits : get().habits,
-              habitLogs: data.habitLogs.length > 0 ? data.habitLogs : get().habitLogs,
-              moodLogs: data.moodLogs.length > 0 ? data.moodLogs : get().moodLogs,
-              skipLogs: data.skipLogs.length > 0 ? data.skipLogs : get().skipLogs,
+              habits: data.habits,
+              habitLogs: data.habitLogs,
+              moodLogs: data.moodLogs,
+              skipLogs: data.skipLogs,
               weeklyContractTarget: data.profile?.weeklyContractTarget ?? get().weeklyContractTarget,
               momentumScore: data.profile?.momentumScore ?? get().momentumScore,
               lastDecayDate: data.profile?.lastDecayDate ?? get().lastDecayDate,
@@ -750,42 +762,48 @@ export const useKineticStore = create<KineticState>()(
       applyDailyDecay: () => {
         const state = get();
         const today = getDateString();
-        
+        const lastDecayDate = state.lastDecayDate ?? addDays(today, -1);
+
         if (state.lastDecayDate === today) return;
 
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayString = getDateString(yesterday);
-        const dayOfWeek = getDayOfWeek(yesterday);
+        const daysSinceDecay = Math.max(0, daysBetween(lastDecayDate, today));
+        if (daysSinceDecay === 0) {
+          set({ lastDecayDate: today });
+          return;
+        }
 
-        const missedHabits = state.habits.filter((habit) => {
-          if (habit.deletedAt || !habit.schedule.includes(dayOfWeek)) return false;
-          
-          const log = state.habitLogs.find(
-            (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(yesterdayString)
-          );
-          const skipLog = state.skipLogs.find(
-            (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === yesterdayString
-          );
-          
-          const status = getCompletionStatus(log, skipLog, habit, yesterdayString);
-          return status === 'missed';
-        });
+        let totalPenalty = 0;
+        const habitsToResetStreak = new Set<string>();
 
-        const totalPenalty = missedHabits.reduce((sum, h) => {
-          return sum + Math.abs(calculateMomentumChange(0, true));
-        }, 0);
-        
+        for (let i = 1; i <= daysSinceDecay; i++) {
+          const dateKey = addDays(lastDecayDate, i);
+          const dayOfWeek = getDayOfWeek(new Date(dateKey + 'T12:00:00'));
+
+          const missedHabits = state.habits.filter((habit) => {
+            if (habit.deletedAt || !habit.schedule.includes(dayOfWeek)) return false;
+            const log = state.habitLogs.find(
+              (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateKey)
+            );
+            const skipLog = state.skipLogs.find(
+              (l) => !l.deletedAt && l.habitId === habit.id && l.dateKey === dateKey
+            );
+            const status = getCompletionStatus(log, skipLog, habit, dateKey);
+            return status === 'missed';
+          });
+
+          totalPenalty += missedHabits.reduce((sum) => sum + Math.abs(calculateMomentumChange(0, true)), 0);
+          totalPenalty += MOMENTUM_CONSTANTS.DAILY_DECAY;
+          missedHabits.forEach((h) => habitsToResetStreak.add(h.id));
+        }
+
         const updatedHabits = state.habits.map((habit) => {
           if (habit.deletedAt) return habit;
-          if (missedHabits.find((m) => m.id === habit.id)) {
-            return { ...habit, streak: 0 };
-          }
+          if (habitsToResetStreak.has(habit.id)) return { ...habit, streak: 0 };
           return habit;
         });
 
         set({
-          momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - totalPenalty - MOMENTUM_CONSTANTS.DAILY_DECAY),
+          momentumScore: Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore - totalPenalty),
           habits: updatedHabits,
           lastDecayDate: today,
         });
@@ -797,11 +815,8 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (!habit) return { current: 0, target: 1, percent: 0 };
-        
-        const log = state.habitLogs.find(
-          (l) => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateKey)
-        );
-        
+        const logIndex = buildLogIndex(state.habitLogs);
+        const log = logIndex.get(`${habitId}:${dateKey}`);
         const current = log ? log.value : 0;
         const percent = Math.min(100, (current / habit.target) * 100);
         
@@ -844,12 +859,10 @@ export const useKineticStore = create<KineticState>()(
         const state = get();
         const habit = state.habits.find((h) => !h.deletedAt && h.id === habitId);
         if (!habit) return false;
-        const log = state.habitLogs.find(
-          (log) => !log.deletedAt && log.habitId === habitId && log.completedAt.startsWith(dateKey)
-        );
-        const skipLog = state.skipLogs.find(
-          (log) => !log.deletedAt && log.habitId === habitId && log.dateKey === dateKey
-        );
+        const logIndex = buildLogIndex(state.habitLogs);
+        const skipIndex = buildSkipIndex(state.skipLogs);
+        const log = logIndex.get(`${habitId}:${dateKey}`);
+        const skipLog = skipIndex.get(`${habitId}:${dateKey}`);
         const status = getCompletionStatus(log, skipLog, habit, dateKey);
         return status === 'complete' || status === 'skipped';
       },
@@ -1042,32 +1055,31 @@ export const useKineticStore = create<KineticState>()(
 
       getDayOfWeekEfficiency: () => {
         const state = get();
-        const daysOrder: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        
+        const daysOrder: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const today = new Date();
+        const todayDayIndex = today.getDay();
+
         return daysOrder.map((day) => {
           let totalScheduled = 0;
           let totalCompletionValue = 0;
-          
+          const targetDayIndex = daysOrder.indexOf(day);
+
           for (let week = 0; week < 12; week++) {
-            const date = new Date();
-            const currentDayIndex = date.getDay();
-            const targetDayIndex = daysOrder.indexOf(day) + 1; // +1 because Sun=0 in JS
-            const diff = targetDayIndex - currentDayIndex - (week * 7);
-            date.setDate(date.getDate() + diff);
+            const daysBack = ((todayDayIndex - targetDayIndex + 7) % 7) + week * 7;
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() - daysBack);
+
+            if (targetDate > today) continue;
+
+            const dateString = getDateString(targetDate);
             
-            if (date > new Date()) continue;
-            
-            const dateString = getDateString(date);
-            
+            const logIndex = buildLogIndex(state.habitLogs);
+            const skipIndex = buildSkipIndex(state.skipLogs);
             state.habits.filter(h => !h.deletedAt).forEach((habit) => {
               if (habit.schedule.includes(day)) {
                 totalScheduled++;
-                const log = state.habitLogs.find(
-                  (log) => !log.deletedAt && log.habitId === habit.id && log.completedAt.startsWith(dateString)
-                );
-                const skipLog = state.skipLogs.find(
-                  (log) => !log.deletedAt && log.habitId === habit.id && log.dateKey === dateString
-                );
+                const log = logIndex.get(`${habit.id}:${dateString}`);
+                const skipLog = skipIndex.get(`${habit.id}:${dateString}`);
                 const status = getCompletionStatus(log, skipLog, habit, dateString);
                 
                 if (status === 'complete' || status === 'skipped') {
@@ -1372,7 +1384,15 @@ export const useKineticStore = create<KineticState>()(
         };
       },
 
-      clearAllData: () => {
+      clearAllData: async () => {
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            await deleteAllUserData(user.uid);
+          } catch (error) {
+            console.error('Failed to clear Firestore data:', error);
+          }
+        }
         set({
           habits: [],
           habitLogs: [],
@@ -1399,6 +1419,31 @@ export const useKineticStore = create<KineticState>()(
         });
       },
 
+      loadDemoData: async () => {
+        const { DEMO_HABIT_CONFIGS, generateHistoricalData, calculateStreaksForHabits } = await import('@/lib/demoData');
+        const state = get();
+        if (state.habits.length > 0) return;
+        for (const habit of DEMO_HABIT_CONFIGS) {
+          await get().addHabit(habit);
+        }
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 90);
+        const startDateISO = getLocalDateKey(startDate);
+        set((s) => ({
+          habits: s.habits.map((h) => ({ ...h, createdAt: startDateISO })),
+        }));
+        const createdHabits = get().habits;
+        const { logs, moods } = generateHistoricalData(createdHabits);
+        const finalHabits = calculateStreaksForHabits(createdHabits, logs);
+        set({
+          habits: finalHabits,
+          habitLogs: [...get().habitLogs, ...logs],
+          moodLogs: [...get().moodLogs, ...moods],
+          momentumScore: 85,
+        });
+      },
+
       updateWeeklyMomentum: () => {
         const state = get();
         const today = new Date();
@@ -1421,10 +1466,19 @@ export const useKineticStore = create<KineticState>()(
     }),
     {
       name: 'kinetic-storage',
-      partialize: (state) => {
-        const { modalCount, ...rest } = state;
-        return rest;
-      },
+      partialize: (state) => ({
+        habits: state.habits,
+        habitLogs: state.habitLogs,
+        moodLogs: state.moodLogs,
+        skipLogs: state.skipLogs,
+        momentumScore: state.momentumScore,
+        lastDecayDate: state.lastDecayDate,
+        weeklyContractTarget: state.weeklyContractTarget,
+        previousWeekMomentum: state.previousWeekMomentum,
+        userName: state.userName,
+        userIcon: state.userIcon,
+        theme: state.theme,
+      }),
       // Migration to add new fields to existing habits
       onRehydrateStorage: () => (state) => {
         if (state) {

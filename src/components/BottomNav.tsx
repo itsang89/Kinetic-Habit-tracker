@@ -26,12 +26,12 @@ export default function BottomNav() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pt-2"
+          className="fixed bottom-0 left-0 right-0 z-50 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]"
         >
           <div className="max-w-md mx-auto">
             <div className="glass depth-hover bg-[var(--bg-frame)]/85 backdrop-blur-xl border border-[var(--theme-border)] rounded-2xl px-2 py-2 flex items-center justify-around">
               {navItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
                 const Icon = item.icon;
 
                 return (

@@ -3,9 +3,15 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Zap } from 'lucide-react';
+import { Zap, RefreshCw } from 'lucide-react';
 
-export default function Header() {
+interface HeaderProps {
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  showSync?: boolean;
+}
+
+export default function Header({ onRefresh, isRefreshing, showSync }: HeaderProps) {
   const [dateString, setDateString] = useState('');
 
   useEffect(() => {
@@ -35,6 +41,18 @@ export default function Header() {
           <h1 className="text-3xl font-bold text-[var(--theme-text-primary)] tracking-tight">Kinetic</h1>
           <p className="text-sm text-[var(--theme-text-secondary)] uppercase tracking-widest font-medium text-[11px]">{dateString}</p>
         </div>
+        {showSync && onRefresh && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-full hover:bg-[var(--theme-foreground)]/10 transition-colors"
+            title="Sync"
+          >
+            <RefreshCw className={`w-5 h-5 text-[var(--theme-text-secondary)] ${isRefreshing ? 'animate-spin' : ''}`} />
+          </motion.button>
+        )}
       </div>
     </motion.header>
   );

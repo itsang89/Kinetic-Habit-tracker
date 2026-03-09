@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Bell, Sun, Moon, Download, Upload, FileJson, FileSpreadsheet, Shield, HelpCircle, Info, ChevronRight, Trash2, ArrowLeft, Edit3, X, Droplet, Book, Brain, Dumbbell, Heart, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star } from 'lucide-react';
+import { LogOut, User, Bell, Sun, Moon, Download, Upload, FileJson, FileSpreadsheet, Shield, HelpCircle, Info, ChevronRight, Trash2, ArrowLeft, Edit3, X, Droplet, Book, Brain, Dumbbell, Heart, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star, RefreshCw } from 'lucide-react';
 import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog, SkipLog } from '@/store/useKineticStore';
 import { getLocalDateKey } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,12 +20,14 @@ export default function ProfilePage() {
   const { 
     theme, setTheme, getExportData, clearAllData, getJoinDate, 
     habits, habitLogs, moodLogs, userName, userIcon, updateUserProfile,
-    addHabit, logHabitCompletion, logMood, logSkip, setWeeklyContractTarget
+    addHabit, logHabitCompletion, logMood, logSkip, setWeeklyContractTarget,
+    fetchFromCloud
   } = store;
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const router = useRouter();
   const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isClearingData, setIsClearingData] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editName, setEditName] = useState(userName);
@@ -33,6 +35,10 @@ export default function ProfilePage() {
   const [joinDate, setJoinDate] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     if (mounted) {
@@ -93,7 +99,7 @@ export default function ProfilePage() {
         }
         
         // Clear existing data
-        clearAllData();
+        await clearAllData();
         
         // Import habits
         for (const habit of data.habits) {
@@ -219,8 +225,10 @@ export default function ProfilePage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleLogout = () => {
-    clearAllData();
+  const handleLogout = async () => {
+    setIsClearingData(true);
+    await clearAllData();
+    setIsClearingData(false);
     setShowLogoutConfirm(false);
   };
 
@@ -292,15 +300,15 @@ export default function ProfilePage() {
               {/* Quick Stats */}
               <div className="flex gap-8 mt-6 pt-6 border-t border-[var(--theme-border)] w-full justify-center">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{habits.length}</p>
+                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{habits.filter((h) => !h.deletedAt).length}</p>
                   <p className="text-xs text-[var(--theme-text-secondary)] uppercase tracking-wider">Habits</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{habitLogs.length}</p>
+                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{habitLogs.filter((l) => !l.deletedAt).length}</p>
                   <p className="text-xs text-[var(--theme-text-secondary)] uppercase tracking-wider">Completions</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{moodLogs.length}</p>
+                  <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{moodLogs.filter((l) => !l.deletedAt).length}</p>
                   <p className="text-xs text-[var(--theme-text-secondary)] uppercase tracking-wider">Mood Logs</p>
                 </div>
               </div>
@@ -418,6 +426,29 @@ export default function ProfilePage() {
                 <Download className="w-4 h-4 text-[var(--theme-text-secondary)]" />
               </button>
 
+              {/* Sync now */}
+              {user && (
+                <button
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    await fetchFromCloud();
+                    setIsSyncing(false);
+                  }}
+                  disabled={isSyncing}
+                  className="w-full flex items-center justify-between p-4 border-b border-[var(--theme-border)] hover:bg-[var(--theme-foreground)]/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--theme-foreground)]/10 flex items-center justify-center">
+                      <RefreshCw className={`w-4 h-4 text-[var(--theme-text-primary)] ${isSyncing ? 'animate-spin' : ''}`} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-[var(--theme-text-primary)]">Sync now</p>
+                      <p className="text-xs text-[var(--theme-text-secondary)]">Refresh from cloud</p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {/* Privacy */}
               <button
                 onClick={() => alert('Privacy Policy\n\nAll your data is stored locally in your browser.\n\nWe do not share your data with third parties. Your habits, logs, and mood entries stay on this device unless you export them.')}
@@ -499,6 +530,15 @@ export default function ProfilePage() {
                 <Trash2 className="w-4 h-4" />
                 <span className="text-sm font-medium">Clear Local Data</span>
               </button>
+
+              {user && (
+                <button
+                  onClick={() => setShowDeleteAccountConfirm(true)}
+                  className="flex items-center justify-center gap-2 text-[var(--color-error)]/80 hover:text-[var(--color-error)] transition-colors text-sm"
+                >
+                  Delete Account
+                </button>
+              )}
             </div>
           </motion.div>
         </div>
@@ -573,9 +613,70 @@ export default function ProfilePage() {
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="flex-1 py-3 rounded-xl bg-[var(--color-error)] text-[var(--bg-base)] font-medium hover:brightness-95 transition-colors"
+                    disabled={isClearingData}
+                    className="flex-1 py-3 rounded-xl bg-[var(--color-error)] text-[var(--bg-base)] font-medium hover:brightness-95 transition-colors disabled:opacity-70"
                   >
-                    Delete All
+                    {isClearingData ? 'Clearing...' : 'Delete All'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete Account Modal */}
+        <AnimatePresence>
+          {showDeleteAccountConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-base)]/70 backdrop-blur-sm"
+              onClick={() => setShowDeleteAccountConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="glass p-6 max-w-sm w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-[var(--color-error)] mb-2">Delete Account?</h3>
+                <p className="text-sm text-[var(--theme-text-secondary)] mb-4">
+                  This will permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+                {user?.providerData[0]?.providerId === 'password' && (
+                  <input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={deleteAccountPassword}
+                    onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                    className="w-full bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] rounded-xl px-4 py-3 text-[var(--theme-text-primary)] mb-4 focus:outline-none focus:border-[var(--theme-foreground)]/30"
+                  />
+                )}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountPassword(''); }}
+                    className="flex-1 py-3 rounded-xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsDeletingAccount(true);
+                      try {
+                        await deleteAccount(user?.providerData[0]?.providerId === 'password' ? deleteAccountPassword : undefined);
+                        router.push('/login');
+                      } catch (err) {
+                        setImportError(err instanceof Error ? err.message : 'Failed to delete account');
+                      } finally {
+                        setIsDeletingAccount(false);
+                      }
+                    }}
+                    disabled={isDeletingAccount || (user?.providerData[0]?.providerId === 'password' && !deleteAccountPassword)}
+                    className="flex-1 py-3 rounded-xl bg-[var(--color-error)] text-white font-medium disabled:opacity-50"
+                  >
+                    {isDeletingAccount ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>

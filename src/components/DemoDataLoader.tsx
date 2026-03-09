@@ -6,71 +6,31 @@ import { useKineticStore } from '@/store/useKineticStore';
 import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { useMounted } from '@/hooks/useMounted';
-import { getLocalDateKey } from '@/lib/dateUtils';
-import { DEMO_HABIT_CONFIGS, generateHistoricalData, calculateStreaksForHabits } from '@/lib/demoData';
 
 export default function DemoDataLoader() {
-  const store = useKineticStore();
+  const habits = useKineticStore((s) => s.habits);
+  const habitLogs = useKineticStore((s) => s.habitLogs);
+  const loadDemoData = useKineticStore((s) => s.loadDemoData);
+  const clearAllData = useKineticStore((s) => s.clearAllData);
   const [showButton, setShowButton] = useState(false);
   const mounted = useMounted();
 
   useEffect(() => {
-    // Only show the button if no data exists, after hydration
-    if (mounted && store.habits.length === 0 && store.habitLogs.length === 0 && store.moodLogs.length === 0) {
+    const activeHabits = habits.filter((h) => !h.deletedAt);
+    if (mounted && activeHabits.length === 0 && habitLogs.length === 0) {
       setShowButton(true);
+    } else {
+      setShowButton(false);
     }
-  }, [mounted, store.habits.length, store.habitLogs.length, store.moodLogs.length]);
+  }, [mounted, habits, habitLogs]);
 
-  const loadDemoData = async () => {
-    // Add habits
-    for (const habit of DEMO_HABIT_CONFIGS) {
-      await store.addHabit(habit);
-    }
-    
-    // Generate 90 days of historical data
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - 90);
-    const startDateISO = getLocalDateKey(startDate);
-
-    // Update habits to have a past createdAt date
-    useKineticStore.setState((state) => ({
-      habits: state.habits.map(h => ({ ...h, createdAt: startDateISO }))
-    }));
-
-    const createdHabits = useKineticStore.getState().habits;
-    const { logs, moods } = generateHistoricalData(createdHabits);
-    const finalHabits = calculateStreaksForHabits(createdHabits, logs);
-    
-    // Directly set the state with all the generated data
-    useKineticStore.setState((state) => ({
-      habits: finalHabits,
-      habitLogs: [...state.habitLogs, ...logs],
-      moodLogs: [...state.moodLogs, ...moods],
-      momentumScore: 85, // Start with a very good momentum
-    }));
-    
-    setShowButton(false);
+  const resetAndLoadDemo = async () => {
+    await clearAllData();
+    setTimeout(() => void loadDemoData(), 100);
   };
 
-  const resetAndLoadDemo = () => {
-    // Clear all store data
-    useKineticStore.setState({
-      habits: [],
-      habitLogs: [],
-      moodLogs: [],
-      momentumScore: 50,
-      lastDecayDate: null,
-      previousWeekMomentum: 50,
-    });
-    
-    // Small delay to let state clear, then load demo
-    setTimeout(() => {
-      loadDemoData();
-    }, 100);
-  };
-
-  const hasData = store.habits.length > 0 || store.habitLogs.length > 0;
+  const activeHabits = habits.filter((h) => !h.deletedAt);
+  const hasData = activeHabits.length > 0 || habitLogs.length > 0;
 
   if (!mounted) return null;
 
@@ -82,7 +42,7 @@ export default function DemoDataLoader() {
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={loadDemoData}
+          onClick={() => loadDemoData()}
           className="fixed bottom-24 right-8 px-5 py-3 rounded-full bg-[var(--theme-foreground)] text-[var(--theme-background)] font-bold text-sm flex items-center gap-2 shadow-[0_0_20px_var(--theme-glow)] hover:shadow-[0_0_30px_var(--theme-glow)] transition-all z-50 uppercase tracking-wide"
         >
           <Play className="w-4 h-4 fill-current" />

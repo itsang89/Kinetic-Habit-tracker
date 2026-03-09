@@ -12,6 +12,8 @@ import TimePerformanceChart from '@/components/trends/TimePerformanceChart';
 import MoodInsightCard from '@/components/trends/MoodInsightCard';
 import HabitHealthGrid from '@/components/trends/HabitHealthGrid';
 import WeeklyWrapCard from '@/components/trends/WeeklyWrapCard';
+import HabitHeatmap from '@/components/HabitHeatmap';
+import MoodCorrelationChart from '@/components/MoodCorrelationChart';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function TrendsPage() {
@@ -62,7 +64,15 @@ export default function TrendsPage() {
                 <MoodInsightCard />
               </div>
               
-              {/* Row 4: Paper Chain (full width) */}
+              {/* Row 4: Consistency Heatmap, Mood Correlation */}
+              <div className="md:col-span-2 lg:col-span-3">
+                <HabitHeatmap />
+              </div>
+              <div className="md:col-span-2 lg:col-span-3">
+                <MoodCorrelationChart />
+              </div>
+
+              {/* Row 5: Paper Chain (full width) */}
               <div className="md:col-span-2 lg:col-span-3">
                 <PaperChain />
               </div>
