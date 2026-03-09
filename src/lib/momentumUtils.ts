@@ -8,22 +8,32 @@ export type MomentumStatus = {
 
 /**
  * Momentum calculation rules for V2:
- * - Proportional boost: completionRate * 10 (capped at +10 per habit per day)
- * - Miss penalty: -5 per missed scheduled habit (status === 'missed')
+ * - Proportional boost: completionRate * 10 with diminishing returns near ceiling
+ * - Proportional miss penalty: -(totalMissed/totalScheduled)*10
  * - Daily base decay: -2 (already in constants)
  */
 
+export function gainMultiplier(currentScore: number): number {
+  if (currentScore < 50) return 1.5;
+  if (currentScore < 80) return 1.0;
+  if (currentScore < 95) return 0.5;
+  return 0.25;
+}
+
 export const calculateMomentumChange = (
   completionRate: number, // 0 to 1
-  isMissed: boolean
+  isMissed: boolean,
+  totalScheduled = 1,
+  totalMissed = 1,
+  currentScore = 50
 ): number => {
-  if (isMissed) {
-    return -5; // Penalty for missed scheduled habit
+  if (isMissed && totalScheduled > 0) {
+    return -Math.round((Math.max(totalMissed, 1) / totalScheduled) * 10);
   }
   
-  // Proportional boost: +10 for 100% completion, +5 for 50%, etc.
-  const boost = Math.min(10, completionRate * 10);
-  return boost;
+  const baseBoost = Math.min(10, completionRate * 10);
+  const multiplier = gainMultiplier(currentScore);
+  return Math.round(baseBoost * multiplier);
 };
 
 export const getMomentumStatus = (score: number): MomentumStatus => {

@@ -14,9 +14,13 @@ interface HistoryEntry {
 interface HabitHistoryProps {
   habit: Habit;
   historyLog: HistoryEntry[];
+  totalCount?: number;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-export default function HabitHistory({ habit, historyLog }: HabitHistoryProps) {
+export default function HabitHistory({ habit, historyLog, totalCount, hasMore, onLoadMore }: HabitHistoryProps) {
+  const displayCount = totalCount ?? historyLog.length;
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -26,7 +30,7 @@ export default function HabitHistory({ habit, historyLog }: HabitHistoryProps) {
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-widest">Activity Log</h3>
-        <span className="text-xs text-[var(--theme-text-muted)]">{historyLog.length} entries</span>
+        <span className="text-xs text-[var(--theme-text-muted)]">Showing {historyLog.length} of {displayCount}</span>
       </div>
       
       <div className="space-y-3 max-h-[300px] overflow-y-auto">
@@ -52,6 +56,14 @@ export default function HabitHistory({ habit, historyLog }: HabitHistoryProps) {
           ))
         )}
       </div>
+      {hasMore && onLoadMore && (
+        <button
+          onClick={onLoadMore}
+          className="w-full mt-4 py-3 rounded-xl border border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-foreground)]/5 hover:text-[var(--theme-text-primary)] transition-colors text-sm font-medium"
+        >
+          Load More
+        </button>
+      )}
     </motion.div>
   );
 }

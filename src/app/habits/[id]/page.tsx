@@ -110,7 +110,7 @@ export default function HabitDetailPage() {
         const log = habitLogs.find(l => !l.deletedAt && l.habitId === habitId && l.completedAt.startsWith(dateString));
         const completionRate = log ? Math.min(1, log.value / habit.target) : 0;
         const isMissed = !log;
-        const change = calculateMomentumChange(completionRate, isMissed);
+        const change = calculateMomentumChange(completionRate, isMissed, 1, isMissed ? 1 : 0, runningScore);
         runningScore += change;
       }
 
@@ -124,13 +124,20 @@ export default function HabitDetailPage() {
     return data;
   }, [habit, habitLogs, habitId]);
 
-  const historyLog = useMemo(() => {
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 20;
+  
+  const allHistoryLogs = useMemo(() => {
     if (!habit) return [];
-    
     return habitLogs
       .filter(l => !l.deletedAt && l.habitId === habitId)
-      .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-      .slice(0, 50)
+      .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+  }, [habit, habitLogs, habitId]);
+
+  const historyLog = useMemo(() => {
+    if (!habit) return [];
+    return allHistoryLogs
+      .slice(0, historyPage * HISTORY_PAGE_SIZE)
       .map(log => {
         const date = new Date(log.completedAt);
         const moodLog = moodLogs.find(m => !m.deletedAt && m.loggedAt.startsWith(getLocalDateKey(new Date(log.completedAt))));
@@ -142,7 +149,7 @@ export default function HabitDetailPage() {
           mood: moodLog?.score || null,
         };
       });
-  }, [habit, habitLogs, moodLogs, habitId]);
+  }, [habit, allHistoryLogs, moodLogs, habitId, historyPage]);
 
   const peakTime = useMemo(() => {
     const max = timeAnalysis.reduce((best, block) => block.count > best.count ? block : best, { label: '', count: 0 });
@@ -215,7 +222,10 @@ export default function HabitDetailPage() {
 
           <HabitHistory 
             habit={habit} 
-            historyLog={historyLog} 
+            historyLog={historyLog}
+            totalCount={allHistoryLogs.length}
+            hasMore={historyLog.length < allHistoryLogs.length}
+            onLoadMore={() => setHistoryPage(p => p + 1)}
           />
 
           <HabitSettings 

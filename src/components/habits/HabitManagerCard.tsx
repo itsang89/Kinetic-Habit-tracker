@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { 
   Droplet, Book, Brain, Dumbbell, Heart, Sun, Moon, Coffee, 
   Pencil, Code, Music, Leaf, Target, Zap, Star,
-  Edit3, Archive, ArchiveRestore, ChevronRight
+  Edit3, Archive, ArchiveRestore, ChevronRight, Copy, MoreVertical
 } from 'lucide-react';
 import { Habit, HabitIcon, useKineticStore } from '@/store/useKineticStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -20,6 +20,7 @@ interface HabitManagerCardProps {
   isEditMode: boolean;
   onSelect: () => void;
   onEdit: () => void;
+  onDuplicate?: () => void;
 }
 
 function HabitManagerCardComponent({ 
@@ -27,12 +28,14 @@ function HabitManagerCardComponent({
   isSelected, 
   isEditMode, 
   onSelect, 
-  onEdit 
+  onEdit,
+  onDuplicate 
 }: HabitManagerCardProps) {
   const router = useRouter();
   const { getWeeklyHabitData, archiveHabit, unarchiveHabit, setGlobalModalOpen } = useKineticStore();
   const [showActions, setShowActions] = useState<'left' | 'right' | null>(null);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const isDragging = useRef(false);
 
   useEffect(() => {
@@ -119,7 +122,7 @@ function HabitManagerCardComponent({
         )}
       </div>
       
-      {/* Right action (edit) */}
+      {/* Right action (edit) - long swipe for edit, could add duplicate in context menu */}
       <div className={`absolute right-4 top-1/2 -translate-y-1/2 transition-opacity duration-200 ${showActions === 'right' ? 'opacity-100' : 'opacity-0'}`}>
         <Edit3 className="w-6 h-6 text-[var(--color-success)]" />
       </div>
@@ -206,8 +209,38 @@ function HabitManagerCardComponent({
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
+          {/* Stats & Menu */}
+          <div className="text-right flex-shrink-0 flex flex-col items-end gap-1 relative">
+            {onDuplicate && (
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                  className="p-2 rounded-lg hover:bg-[var(--theme-foreground)]/10 text-[var(--theme-text-secondary)] transition-colors"
+                  aria-label="More options"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+                {showMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} aria-hidden="true" />
+                    <div className="absolute right-0 top-full mt-1 py-1 glass rounded-xl shadow-lg z-20 min-w-[140px]">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(); setShowMenu(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/10 flex items-center gap-2"
+                      >
+                        <Edit3 className="w-4 h-4" /> Edit
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDuplicate(); setShowMenu(false); }}
+                        className="w-full px-4 py-2 text-left text-sm text-[var(--theme-text-primary)] hover:bg-[var(--theme-foreground)]/10 flex items-center gap-2"
+                      >
+                        <Copy className="w-4 h-4" /> Duplicate
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {habit.isArchived ? (
               <motion.button
                 whileHover={{ scale: 1.1 }}

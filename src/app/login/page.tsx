@@ -1,10 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { LogIn, UserPlus, Mail, Lock, ArrowRight, Sparkles, Chrome } from 'lucide-react';
+import { getRedirectResult } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -18,6 +20,12 @@ export default function LoginPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const router = useRouter();
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordReset } = useAuth();
+
+  useEffect(() => {
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) router.push('/');
+    }).catch(() => {});
+  }, [router]);
 
   const validateForm = (): string | null => {
     // Validate email

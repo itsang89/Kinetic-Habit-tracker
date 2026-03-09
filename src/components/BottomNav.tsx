@@ -22,6 +22,7 @@ export default function BottomNav() {
     <AnimatePresence>
       {modalCount === 0 && (
         <motion.nav
+          aria-label="Main navigation"
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
@@ -39,6 +40,7 @@ export default function BottomNav() {
                     key={item.href}
                     href={item.href}
                     className="relative flex-1"
+                    aria-current={isActive ? 'page' : undefined}
                   >
                     <motion.div
                       whileHover={{ scale: 1.05 }}

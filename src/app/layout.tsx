@@ -25,11 +25,16 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-[var(--theme-foreground)] focus:text-[var(--theme-background)] rounded-lg">
+          Skip to main content
+        </a>
         <ErrorBoundary>
           <AuthProvider>
             <ThemeProvider>
               <ToastProvider>
-                {children}
+                <main id="main-content" tabIndex={-1}>
+                  {children}
+                </main>
               </ToastProvider>
             </ThemeProvider>
           </AuthProvider>

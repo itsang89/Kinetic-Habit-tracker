@@ -11,15 +11,19 @@ type PaperChainData = { date: string; complete: boolean; partial: boolean; compl
 
 import { useMounted } from '@/hooks/useMounted';
 
-export default function PaperChain() {
+interface PaperChainProps {
+  days?: number;
+}
+
+export default function PaperChain({ days = 30 }: PaperChainProps) {
   const { getPaperChainData, habits } = useKineticStore();
   const mounted = useMounted();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [chainLength, setChainLength] = useState(0);
   const [showModal, setShowModal] = useState(false);
 
-  const chainData = mounted ? getPaperChainData(30) : [];
-  const fullChainData = mounted ? getPaperChainData(90) : []; // 90 days for full view
+  const chainData = mounted ? getPaperChainData(days) : [];
+  const fullChainData = mounted ? getPaperChainData(Math.max(days, 90)) : [];
 
   // Calculate current chain length (consecutive complete days from today backwards)
   useEffect(() => {

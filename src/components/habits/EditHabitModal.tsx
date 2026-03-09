@@ -59,7 +59,7 @@ export default function EditHabitModal({ habit, isOpen, onClose }: EditHabitModa
     const formData = validate();
     if (!formData) return;
 
-    if (habit) {
+    if (habit?.id) {
       await updateHabit(habit.id, formData);
     } else {
       await addHabit(formData);

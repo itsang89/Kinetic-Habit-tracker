@@ -39,33 +39,33 @@ export default function CompactStats() {
   if (!mounted) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-3 mb-6">
+    <div className="flex gap-2 sm:flex-1 min-w-0">
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass depth-hover p-4 rounded-xl flex items-center justify-between"
+        className="glass depth-hover flex-1 min-w-0 p-3 rounded-xl flex items-center gap-3"
       >
-        <div>
-           <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold mb-1">Today's Focus</p>
-           <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{completionRate}%</p>
+        <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+          <CheckCircle2 className="w-4 h-4 text-[var(--brand-main)]" />
         </div>
-        <div className="w-10 h-10 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center">
-          <CheckCircle2 className="w-5 h-5 text-[var(--brand-main)]" />
+        <div className="min-w-0">
+          <p className="text-[9px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold">Today's Focus</p>
+          <p className="text-lg font-bold text-[var(--theme-text-primary)] leading-tight">{completionRate}%</p>
         </div>
       </motion.div>
 
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass depth-hover p-4 rounded-xl flex items-center justify-between"
+        transition={{ delay: 0.05 }}
+        className="glass depth-hover flex-1 min-w-0 p-3 rounded-xl flex items-center gap-3"
       >
-        <div>
-           <p className="text-[10px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold mb-1">Momentum</p>
-           <p className="text-2xl font-bold text-[var(--theme-text-primary)]">{Math.round(momentumScore)}</p>
+        <div className="w-8 h-8 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+          <Flame className="w-4 h-4 text-[#FF5733]" fill="currentColor" />
         </div>
-        <div className="w-10 h-10 rounded-full bg-[var(--brand-main)]/15 border border-[var(--border-subtle)] flex items-center justify-center">
-          <Flame className="w-5 h-5 text-[#FF5733]" fill="currentColor" />
+        <div className="min-w-0">
+          <p className="text-[9px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold">Momentum</p>
+          <p className="text-lg font-bold text-[var(--theme-text-primary)] leading-tight">{Math.round(momentumScore)}</p>
         </div>
       </motion.div>
     </div>

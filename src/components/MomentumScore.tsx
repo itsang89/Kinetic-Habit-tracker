@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Zap, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useKineticStore } from '@/store/useKineticStore';
 import { useEffect, useState } from 'react';
 
@@ -37,7 +37,8 @@ export default function MomentumScore() {
     return () => clearInterval(interval);
   }, [momentumScore, displayScore, mounted]);
 
-  const circumference = 2 * Math.PI * 90;
+  const r = 36;
+  const circumference = 2 * Math.PI * r;
   const strokeDashoffset = circumference - (displayScore / 100) * circumference;
 
   return (
@@ -45,53 +46,38 @@ export default function MomentumScore() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="glass depth-hover p-8 flex flex-col items-center justify-center relative overflow-hidden group"
+      className="glass depth-hover flex items-center gap-3 p-3 rounded-xl shrink-0 sm:min-w-[140px]"
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-[var(--brand-main)]/[0.12] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      
-      <div className="flex items-center gap-2 mb-6 z-10">
-        <div className="w-1 h-1 rounded-full bg-[var(--brand-main)]" />
-        <h2 className="text-sm font-semibold text-[var(--theme-text-primary)] uppercase tracking-widest">Momentum Score</h2>
-        <div className="w-1 h-1 rounded-full bg-[var(--brand-main)]" />
-      </div>
-
-      <div className="relative w-64 h-64 flex items-center justify-center">
-        {/* Glow behind */}
-        <div className="absolute inset-0 rounded-full blur-[60px] bg-[var(--brand-main)]/[0.15]" />
-
-        <svg className="w-full h-full transform -rotate-90 relative z-10">
-          {/* Background circle */}
+      <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+        <svg className="w-full h-full transform -rotate-90" viewBox={`0 0 ${r * 2 + 16} ${r * 2 + 16}`}>
           <circle
-            cx="128"
-            cy="128"
-            r="90"
+            cx={r + 8}
+            cy={r + 8}
+            r={r}
             fill="none"
             stroke="var(--theme-border)"
-            strokeWidth="8"
+            strokeWidth="6"
           />
-          {/* Progress circle */}
           <motion.circle
-            cx="128"
-            cy="128"
-            r="90"
+            cx={r + 8}
+            cy={r + 8}
+            r={r}
             fill="none"
             stroke="var(--brand-main)"
-            strokeWidth="8"
+            strokeWidth="6"
             strokeLinecap="round"
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
             animate={{ strokeDashoffset }}
             transition={{ duration: 1, ease: 'easeOut' }}
             style={{
-              filter: 'drop-shadow(0 0 10px color-mix(in oklab, var(--brand-main) 60%, transparent))'
+              filter: 'drop-shadow(0 0 6px color-mix(in oklab, var(--brand-main) 50%, transparent))'
             }}
           />
         </svg>
-
-        {/* Score display */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+        <div className="absolute inset-0 flex items-center justify-center">
           <motion.span
-            className="text-7xl font-bold text-[var(--theme-text-primary)] tracking-tighter"
+            className="text-xl font-bold text-[var(--theme-text-primary)]"
             key={displayScore}
             initial={{ scale: 1.05 }}
             animate={{ scale: 1 }}
@@ -101,33 +87,24 @@ export default function MomentumScore() {
           </motion.span>
         </div>
       </div>
-
-      {/* Trend indicator */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="flex items-center gap-2 mt-6 py-2 px-4 rounded-full border border-[var(--theme-border)] bg-[var(--brand-main)]/10 backdrop-blur-md"
-      >
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <p className="text-[9px] text-[var(--theme-text-secondary)] uppercase tracking-wider font-bold">Energy</p>
         {trend === 'up' && (
-          <>
-            <TrendingUp className="w-4 h-4 text-[var(--color-success)]" />
-            <span className="text-[var(--color-success)] text-xs font-medium uppercase tracking-wider">Rising</span>
-          </>
+          <span className="flex items-center gap-1 text-[var(--color-success)] text-xs font-medium">
+            <TrendingUp className="w-3 h-3" /> Rising
+          </span>
         )}
         {trend === 'down' && (
-          <>
-            <TrendingDown className="w-4 h-4 text-neutral-400" />
-            <span className="text-neutral-400 text-xs font-medium uppercase tracking-wider">Falling</span>
-          </>
+          <span className="flex items-center gap-1 text-neutral-400 text-xs font-medium">
+            <TrendingDown className="w-3 h-3" /> Falling
+          </span>
         )}
         {trend === 'neutral' && (
-          <>
-            <Minus className="w-4 h-4 text-neutral-500" />
-            <span className="text-neutral-500 text-xs font-medium uppercase tracking-wider">Steady</span>
-          </>
+          <span className="flex items-center gap-1 text-neutral-500 text-xs font-medium">
+            <Minus className="w-3 h-3" /> Steady
+          </span>
         )}
-      </motion.div>
+      </div>
     </motion.div>
   );
 }

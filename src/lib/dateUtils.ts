@@ -72,3 +72,9 @@ export const addDays = (dateKey: string, days: number): string => {
   d.setDate(d.getDate() + days);
   return getLocalDateKey(d);
 };
+
+export const subDays = (date: Date | string, days: number): Date => {
+  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : new Date(date);
+  d.setDate(d.getDate() - days);
+  return d;
+};

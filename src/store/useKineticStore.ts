@@ -13,6 +13,7 @@ import { MOMENTUM_CONSTANTS } from '@/lib/constants';
 import { getLocalDateKey, daysBetween, addDays } from '@/lib/dateUtils';
 import { getCompletionStatus } from '@/lib/completionUtils';
 import { calculateMomentumChange } from '@/lib/momentumUtils';
+import { validateHabit } from '@/lib/habitValidation';
 
 // Simple debounce helper
 const debounce = (fn: Function, ms = 2000) => {
@@ -342,6 +343,10 @@ export const useKineticStore = create<KineticState>()(
       syncError: null,
 
       addHabit: async (habitData) => {
+        const validation = validateHabit({ ...habitData, schedule: habitData.schedule || [] });
+        if (!validation.valid) {
+          throw new Error(validation.errors[0]);
+        }
         const newHabit: Habit = {
           ...habitData,
           id: generateId(),
@@ -368,6 +373,13 @@ export const useKineticStore = create<KineticState>()(
       },
 
       updateHabit: async (habitId, updates) => {
+        const existing = get().habits.find((h) => h.id === habitId);
+        if (existing) {
+          const validation = validateHabit({ ...existing, ...updates });
+          if (!validation.valid) {
+            throw new Error(validation.errors[0]);
+          }
+        }
         set((state) => ({
           habits: state.habits.map((h) =>
             h.id === habitId ? { ...h, ...updates } : h
@@ -481,7 +493,9 @@ export const useKineticStore = create<KineticState>()(
           const streakData = recalculateStreak(habit, newLogs, state.skipLogs, targetDateKey);
           const oldPercent = Math.min(1, oldValue / habit.target);
           const newPercent = Math.min(1, value / habit.target);
-          const momentumChange = calculateMomentumChange(newPercent, false) - calculateMomentumChange(oldPercent, false);
+          const momentumChange = calculateMomentumChange(newPercent, false, 1, 0, state.momentumScore) - calculateMomentumChange(oldPercent, false, 1, 0, state.momentumScore);
+          const streakBonus = Math.min(Math.floor(streakData.streak / 10), 3);
+          const totalMomentumChange = momentumChange + streakBonus;
 
           return {
             habitLogs: newLogs,
@@ -491,7 +505,7 @@ export const useKineticStore = create<KineticState>()(
             habits: state.habits.map((h) =>
               h.id === habitId ? { ...h, streak: streakData.streak, bestStreak: streakData.bestStreak } : h
             ),
-            momentumScore: Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore + momentumChange)),
+            momentumScore: Math.min(MOMENTUM_CONSTANTS.MAX_SCORE, Math.max(MOMENTUM_CONSTANTS.MIN_SCORE, state.momentumScore + totalMomentumChange)),
           };
         });
         debouncedSyncFn(get);
@@ -516,7 +530,7 @@ export const useKineticStore = create<KineticState>()(
           );
           const streakData = recalculateStreak(habit, updatedLogs, state.skipLogs, targetDateKey);
           const percentRemoved = Math.min(1, logToRemove.value / habit.target);
-          const momentumChange = calculateMomentumChange(percentRemoved, false);
+          const momentumChange = calculateMomentumChange(percentRemoved, false, 1, 0, state.momentumScore);
 
           return {
             habitLogs: updatedLogs,
@@ -530,6 +544,7 @@ export const useKineticStore = create<KineticState>()(
       },
 
       logMood: async (score, dateKey) => {
+        const clampedScore = Math.max(1, Math.min(10, Math.round(score)));
         const targetDateKey = dateKey || get().selectedDate;
         const state = get();
         
@@ -540,13 +555,13 @@ export const useKineticStore = create<KineticState>()(
         if (existingLog) {
           set((state) => ({
             moodLogs: state.moodLogs.map((log) =>
-              log.id === existingLog.id ? { ...log, score } : log
+              log.id === existingLog.id ? { ...log, score: clampedScore } : log
             ),
           }));
         } else {
           const newLog: MoodLog = {
             id: generateId(),
-            score,
+            score: clampedScore,
             loggedAt: targetDateKey === getLocalDateKey()
               ? `${targetDateKey}T${new Date().toLocaleTimeString('sv')}`
               : `${targetDateKey}T21:00:00`,
@@ -779,8 +794,8 @@ export const useKineticStore = create<KineticState>()(
           const dateKey = addDays(lastDecayDate, i);
           const dayOfWeek = getDayOfWeek(new Date(dateKey + 'T12:00:00'));
 
-          const missedHabits = state.habits.filter((habit) => {
-            if (habit.deletedAt || !habit.schedule.includes(dayOfWeek)) return false;
+          const scheduledHabitsForDay = state.habits.filter((h) => !h.deletedAt && h.schedule.includes(dayOfWeek));
+          const missedHabits = scheduledHabitsForDay.filter((habit) => {
             const log = state.habitLogs.find(
               (l) => !l.deletedAt && l.habitId === habit.id && l.completedAt.startsWith(dateKey)
             );
@@ -791,8 +806,12 @@ export const useKineticStore = create<KineticState>()(
             return status === 'missed';
           });
 
-          totalPenalty += missedHabits.reduce((sum) => sum + Math.abs(calculateMomentumChange(0, true)), 0);
-          totalPenalty += MOMENTUM_CONSTANTS.DAILY_DECAY;
+          const totalScheduled = scheduledHabitsForDay.length;
+          const totalMissed = missedHabits.length;
+          const dayPenalty = totalMissed > 0 && totalScheduled > 0
+            ? Math.round((totalMissed / totalScheduled) * 10)
+            : 0;
+          totalPenalty += dayPenalty + MOMENTUM_CONSTANTS.DAILY_DECAY;
           missedHabits.forEach((h) => habitsToResetStreak.add(h.id));
         }
 
@@ -1474,7 +1493,7 @@ export const useKineticStore = create<KineticState>()(
         momentumScore: state.momentumScore,
         lastDecayDate: state.lastDecayDate,
         weeklyContractTarget: state.weeklyContractTarget,
-        previousWeekMomentum: state.previousWeekMomentum,
+        selectedDate: state.selectedDate,
         userName: state.userName,
         userIcon: state.userIcon,
         theme: state.theme,

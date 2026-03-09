@@ -71,7 +71,7 @@ export default function Home() {
             ) : (
               <>
                 <div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
                     <CompactStats />
                     <MomentumScore />
                   </div>

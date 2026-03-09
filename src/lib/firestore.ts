@@ -11,6 +11,20 @@ import {
 import { db } from './firebase';
 import { Habit, HabitLog, MoodLog, SkipLog, HabitIcon } from '../store/useKineticStore';
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === maxRetries - 1) throw e;
+      await sleep(Math.pow(2, i) * 1000);
+    }
+  }
+  throw new Error('Retry exhausted');
+}
+
 // User profile interface matching existing store fields
 export interface UserProfile {
   userName: string;
@@ -37,8 +51,10 @@ export const getProfile = async (userId: string): Promise<UserProfile | null> =>
 };
 
 export const updateProfile = async (userId: string, updates: Partial<UserProfile>) => {
-  const docRef = doc(db, 'users', userId);
-  await setDoc(docRef, { ...updates, lastSyncedAt: new Date().toISOString() }, { merge: true });
+  return withRetry(async () => {
+    const docRef = doc(db, 'users', userId);
+    await setDoc(docRef, { ...updates, lastSyncedAt: new Date().toISOString() }, { merge: true });
+  });
 };
 
 // Generic CRUD helpers for sub-collections
@@ -112,12 +128,14 @@ export const batchUpsert = async <T extends { id: string }>(
 
   for (const chunk of chunks) {
     try {
-      const batch = writeBatch(db);
-      chunk.forEach((item) => {
-        const docRef = doc(db, 'users', userId, collectionName, item.id);
-        batch.set(docRef, item, { merge: true });
+      await withRetry(async () => {
+        const batch = writeBatch(db);
+        chunk.forEach((item) => {
+          const docRef = doc(db, 'users', userId, collectionName, item.id);
+          batch.set(docRef, item, { merge: true });
+        });
+        await batch.commit();
       });
-      await batch.commit();
       succeeded += chunk.length;
     } catch (error) {
       console.error(`Firestore batchUpsert failed for ${collectionName}:`, error);

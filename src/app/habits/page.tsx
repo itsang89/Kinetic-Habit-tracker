@@ -13,6 +13,7 @@ import HabitManagerCard from '@/components/habits/HabitManagerCard';
 import EditHabitModal from '@/components/habits/EditHabitModal';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useKineticStore, Habit, HabitCategory } from '@/store/useKineticStore';
+import { getLocalDateKey } from '@/lib/dateUtils';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useMounted } from '@/hooks/useMounted';
 
@@ -192,8 +193,19 @@ function HabitsContent() {
     setShowCategoryMenu(false);
   };
 
-  const openEditModal = (habit: Habit | null) => {
-    setEditingHabit(habit);
+  const openEditModal = (habit: Habit | null, duplicateSource?: Habit) => {
+    if (duplicateSource) {
+      setEditingHabit({
+        ...duplicateSource,
+        id: '',
+        name: `${duplicateSource.name} (copy)`,
+        streak: 0,
+        bestStreak: 0,
+        createdAt: getLocalDateKey(),
+      } as Habit);
+    } else {
+      setEditingHabit(habit);
+    }
     setIsModalOpen(true);
   };
 
@@ -474,6 +486,7 @@ function HabitsContent() {
                           isEditMode={isEditMode}
                           onSelect={() => toggleSelectHabit(habit.id)}
                           onEdit={() => openEditModal(habit)}
+                          onDuplicate={() => openEditModal(null, habit)}
                         />
                       ))}
                     </AnimatePresence>
@@ -510,6 +523,7 @@ function HabitsContent() {
                             isEditMode={isEditMode}
                             onSelect={() => toggleSelectHabit(habit.id)}
                             onEdit={() => openEditModal(habit)}
+                            onDuplicate={() => openEditModal(null, habit)}
                           />
                         ))}
                       </motion.div>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, User, Bell, Sun, Moon, Download, Upload, FileJson, FileSpreadsheet, Shield, HelpCircle, Info, ChevronRight, Trash2, ArrowLeft, Edit3, X, Droplet, Book, Brain, Dumbbell, Heart, Coffee, Pencil, Code, Music, Leaf, Target, Zap, Star, RefreshCw } from 'lucide-react';
 import { useKineticStore, HabitIcon, Habit, HabitLog, MoodLog, SkipLog } from '@/store/useKineticStore';
 import { getLocalDateKey } from '@/lib/dateUtils';
+import { escapeCsvField } from '@/lib/csvUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -23,7 +24,7 @@ export default function ProfilePage() {
     addHabit, logHabitCompletion, logMood, logSkip, setWeeklyContractTarget,
     fetchFromCloud
   } = store;
-  const { user, signOut, deleteAccount } = useAuth();
+  const { user, signOut, deleteAccount, changePassword } = useAuth();
   const router = useRouter();
   const mounted = useMounted();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -36,6 +37,10 @@ export default function ProfilePage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changePasswordCurrent, setChangePasswordCurrent] = useState('');
+  const [changePasswordNew, setChangePasswordNew] = useState('');
+  const [changePasswordConfirm, setChangePasswordConfirm] = useState('');
   const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -98,8 +103,24 @@ export default function ProfilePage() {
           throw new Error('Invalid JSON format: missing or invalid moodLogs array');
         }
         
-        // Clear existing data
+        // Clear existing data and wait for state to settle
         await clearAllData();
+        await new Promise<void>((resolve) => {
+          const unsub = useKineticStore.subscribe((state) => {
+            if (state.habits.length === 0 && state.habitLogs.length === 0) {
+              unsub();
+              resolve();
+            }
+          });
+          // Resolve immediately if already empty (clearAllData is synchronous for state)
+          const state = useKineticStore.getState();
+          if (state.habits.length === 0 && state.habitLogs.length === 0) {
+            unsub();
+            resolve();
+          }
+          // Fallback timeout
+          setTimeout(() => { unsub(); resolve(); }, 2000);
+        });
         
         // Import habits
         for (const habit of data.habits) {
@@ -114,13 +135,9 @@ export default function ProfilePage() {
           });
         }
         
-        // Wait a moment for state to update, then match habits by name
-        // Since habits are added one by one, we need to get the updated list
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Re-fetch habits from the store after import
+        // Wait for habits to be in store (addHabit is sync for state, but use getState for latest)
         const habitIdMap = new Map<string, string>();
-        const currentHabitsAfterImport = store.habits;
+        const currentHabitsAfterImport = useKineticStore.getState().habits;
         
         // Match old habits to new habits by name and schedule (simple approach)
         data.habits.forEach((oldHabit) => {
@@ -198,20 +215,20 @@ export default function ProfilePage() {
   const exportAsCSV = () => {
     const data = getExportData();
     
-    // Create CSV for habits
+    // Create CSV for habits (RFC 4180 compliant escaping)
     let csv = 'Type,ID,Name,Streak,Best Streak,Category,Created At\n';
     data.habits.forEach(h => {
-      csv += `Habit,${h.id},"${h.name}",${h.streak},${h.bestStreak},${h.category},${h.createdAt}\n`;
+      csv += `Habit,${escapeCsvField(h.id)},${escapeCsvField(h.name)},${h.streak},${h.bestStreak},${escapeCsvField(h.category)},${escapeCsvField(h.createdAt)}\n`;
     });
     
     csv += '\nType,Habit ID,Completed At,Value\n';
     data.habitLogs.forEach(l => {
-      csv += `Log,${l.habitId},${l.completedAt},${l.value}\n`;
+      csv += `Log,${escapeCsvField(l.habitId)},${escapeCsvField(l.completedAt)},${l.value}\n`;
     });
     
     csv += '\nType,Score,Logged At\n';
     data.moodLogs.forEach(m => {
-      csv += `Mood,${m.score},${m.loggedAt}\n`;
+      csv += `Mood,${m.score},${escapeCsvField(m.loggedAt)}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -339,6 +356,25 @@ export default function ProfilePage() {
                 </div>
                 <div className="w-12 h-7 bg-[var(--theme-foreground)]/10 rounded-full opacity-50 cursor-not-allowed" />
               </div>
+
+              {/* Change Password - email/password users only */}
+              {user?.providerData[0]?.providerId === 'password' && (
+                <button
+                  onClick={() => setShowChangePassword(true)}
+                  className="w-full flex items-center justify-between p-4 border-b border-[var(--theme-border)] hover:bg-[var(--theme-foreground)]/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--theme-foreground)]/10 flex items-center justify-center">
+                      <Shield className="w-4 h-4 text-[var(--theme-text-primary)]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--theme-text-primary)]">Change Password</p>
+                      <p className="text-xs text-[var(--theme-text-secondary)]">Update your password</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[var(--theme-text-secondary)]" />
+                </button>
+              )}
 
               {/* Theme */}
               <div className="flex items-center justify-between p-4">
@@ -678,6 +714,96 @@ export default function ProfilePage() {
                   >
                     {isDeletingAccount ? 'Deleting...' : 'Delete'}
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Change Password Modal */}
+        <AnimatePresence>
+          {showChangePassword && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-base)]/80 backdrop-blur-sm"
+              onClick={() => { setShowChangePassword(false); setChangePasswordCurrent(''); setChangePasswordNew(''); setChangePasswordConfirm(''); }}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="glass p-6 max-w-sm w-full"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-[var(--theme-text-primary)] mb-4">Change Password</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-wider block mb-2">Current Password</label>
+                    <input
+                      type="password"
+                      value={changePasswordCurrent}
+                      onChange={(e) => setChangePasswordCurrent(e.target.value)}
+                      placeholder="Current password"
+                      className="w-full bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] rounded-xl px-4 py-3 text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-foreground)]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-wider block mb-2">New Password</label>
+                    <input
+                      type="password"
+                      value={changePasswordNew}
+                      onChange={(e) => setChangePasswordNew(e.target.value)}
+                      placeholder="New password"
+                      className="w-full bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] rounded-xl px-4 py-3 text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-foreground)]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[var(--theme-text-secondary)] uppercase tracking-wider block mb-2">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={changePasswordConfirm}
+                      onChange={(e) => setChangePasswordConfirm(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full bg-[var(--theme-foreground)]/5 border border-[var(--theme-border)] rounded-xl px-4 py-3 text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-foreground)]/30"
+                    />
+                  </div>
+                  {importError && <p className="text-[var(--color-error)] text-sm">{importError}</p>}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setShowChangePassword(false); setChangePasswordCurrent(''); setChangePasswordNew(''); setChangePasswordConfirm(''); setImportError(null); }}
+                      className="flex-1 py-3 rounded-xl border border-[var(--theme-border)] text-[var(--theme-text-primary)] font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (changePasswordNew !== changePasswordConfirm) {
+                          setImportError('Passwords do not match');
+                          return;
+                        }
+                        if (changePasswordNew.length < 8) {
+                          setImportError('Password must be at least 8 characters');
+                          return;
+                        }
+                        try {
+                          await changePassword(changePasswordCurrent, changePasswordNew);
+                          setShowChangePassword(false);
+                          setChangePasswordCurrent('');
+                          setChangePasswordNew('');
+                          setChangePasswordConfirm('');
+                          setImportError(null);
+                        } catch (err) {
+                          setImportError(err instanceof Error ? err.message : 'Failed to change password');
+                        }
+                      }}
+                      disabled={!changePasswordCurrent || !changePasswordNew || !changePasswordConfirm}
+                      className="flex-1 py-3 rounded-xl bg-[var(--theme-foreground)] text-[var(--theme-background)] font-medium disabled:opacity-50"
+                    >
+                      Update
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
